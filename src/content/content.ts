@@ -25,25 +25,68 @@ function main() {
   const fab: FloatingButtonHandle = initFloatingButton(panel);
   const selection = initSelectionCapture();
 
-  // Watch for dynamic removals by SPA (Next.js hydration, dynamic routing, etc.)
-  const observer = new MutationObserver((mutations) => {
+  let currentBody = document.body;
+  let bodyObserver: MutationObserver | null = null;
+
+  function setupBodyObserver() {
+    if (bodyObserver) {
+      bodyObserver.disconnect();
+    }
+
+    bodyObserver = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.removedNodes.forEach((node) => {
+          if (node === panel.element && !panel.element.isConnected) {
+            document.body?.appendChild(panel.element);
+          }
+          if (node === fab.element && !fab.element.isConnected) {
+            document.body?.appendChild(fab.element);
+          }
+          if (node === selection.element && !selection.element.isConnected) {
+            document.body?.appendChild(selection.element);
+          }
+        });
+      });
+    });
+
+    if (document.body) {
+      bodyObserver.observe(document.body, { childList: true });
+    }
+  }
+
+  // Inject host elements and setup initial body observer if body is ready
+  if (document.body) {
+    if (!panel.element.isConnected) document.body.appendChild(panel.element);
+    if (!fab.element.isConnected) document.body.appendChild(fab.element);
+    if (!selection.element.isConnected) document.body.appendChild(selection.element);
+    setupBodyObserver();
+  }
+
+  // Parent observer to handle SPA whole-body swaps (like Turbo/pjax on GitHub, YouTube, etc.)
+  // and handle late body creation if body is initially missing
+  const htmlObserver = new MutationObserver((mutations) => {
+    let bodySwappedOrAdded = false;
     mutations.forEach((mutation) => {
-      mutation.removedNodes.forEach((node) => {
-        if (node === panel.element && !panel.element.isConnected) {
-          document.body.appendChild(panel.element);
-        }
-        if (node === fab.element && !fab.element.isConnected) {
-          document.body.appendChild(fab.element);
-        }
-        if (node === selection.element && !selection.element.isConnected) {
-          document.body.appendChild(selection.element);
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeName === "BODY") {
+          bodySwappedOrAdded = true;
         }
       });
     });
+
+    if (bodySwappedOrAdded && document.body && document.body !== currentBody) {
+      currentBody = document.body;
+
+      // Re-append hosts to the new/added body
+      if (!panel.element.isConnected) document.body.appendChild(panel.element);
+      if (!fab.element.isConnected) document.body.appendChild(fab.element);
+      if (!selection.element.isConnected) document.body.appendChild(selection.element);
+
+      setupBodyObserver();
+    }
   });
 
-  // Start observing body mutations
-  observer.observe(document.body, { childList: true });
+  htmlObserver.observe(document.documentElement, { childList: true });
 
   chrome.runtime.onMessage.addListener((message) => {
     if (message.type === "OPEN_PANEL") {
@@ -61,7 +104,10 @@ function main() {
   });
 
   function cleanup() {
-    observer.disconnect();
+    htmlObserver.disconnect();
+    if (bodyObserver) {
+      bodyObserver.disconnect();
+    }
     selection.destroy();
     fab.destroy();
     panel.element.remove();
@@ -74,3 +120,4 @@ if (document.readyState === "loading") {
 } else {
   main();
 }
+
