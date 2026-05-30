@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ClipNote Icon Generator</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 { color: #333; }
+    .icon-preview {
+      display: inline-block;
+      margin: 20px;
+      text-align: center;
+    }
+    .icon-preview canvas {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: white;
+    }
+    .icon-preview p {
+      margin-top: 8px;
+      font-size: 14px;
+      color: #666;
+    }
+    button {
+      background: #6366f1;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    button:hover {
+      background: #4f46e5;
+    }
+  </style>
+</head>
+<body>
+  <h1>ClipNote Icon Generator</h1>
+  <p>Preview and download the extension icons at required sizes.</p>
+
+  <div class="icon-preview">
+    <canvas id="icon16" width="16" height="16"></canvas>
+    <p>16x16</p>
+  </div>
+  <div class="icon-preview">
+    <canvas id="icon48" width="48" height="48"></canvas>
+    <p>48x48</p>
+  </div>
+  <div class="icon-preview">
+    <canvas id="icon128" width="128" height="128"></canvas>
+    <p>128x128</p>
+  </div>
+
+  <br>
+  <button onclick="downloadAll()">Download All Icons</button>
+
+  <script>
+    function drawIcon(ctx, size) {
+      const s = size / 128; // Scale factor
+
+      // Background - notepad body
+      ctx.fillStyle = '#6366f1';
+      ctx.beginPath();
+      ctx.roundRect(20 * s, 24 * s, 88 * s, 96 * s, 8 * s);
+      ctx.fill();
+
+      // Lines on notepad
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.fillRect(36 * s, 48 * s, 56 * s, 4 * s);
+      ctx.fillRect(36 * s, 60 * s, 48 * s, 4 * s);
+      ctx.fillRect(36 * s, 72 * s, 52 * s, 4 * s);
+      ctx.fillRect(36 * s, 84 * s, 40 * s, 4 * s);
+      ctx.fillRect(36 * s, 96 * s, 44 * s, 4 * s);
+
+      // Clip at top
+      ctx.fillStyle = '#4f46e5';
+      ctx.beginPath();
+      ctx.moveTo(44 * s, 8 * s);
+      ctx.lineTo(44 * s, 32 * s);
+      ctx.quadraticCurveTo(44 * s, 40 * s, 52 * s, 40 * s);
+      ctx.lineTo(76 * s, 40 * s);
+      ctx.quadraticCurveTo(84 * s, 40 * s, 84 * s, 32 * s);
+      ctx.lineTo(84 * s, 8 * s);
+      ctx.quadraticCurveTo(84 * s, 0, 76 * s, 0);
+      ctx.lineTo(52 * s, 0);
+      ctx.quadraticCurveTo(44 * s, 0, 44 * s, 8 * s);
+      ctx.fill();
+
+      // Clip hole
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.beginPath();
+      ctx.arc(64 * s, 16 * s, 8 * s, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Draw icons on canvases
+    ['icon16', 'icon48', 'icon128'].forEach(id => {
+      const canvas = document.getElementById(id);
+      const ctx = canvas.getContext('2d');
+      drawIcon(ctx, canvas.width);
+    });
+
+    function downloadCanvasAsPNG(canvas, filename) {
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    function downloadAll() {
+      downloadCanvasAsPNG(document.getElementById('icon16'), 'icon16.png');
+      setTimeout(() => downloadCanvasAsPNG(document.getElementById('icon48'), 'icon48.png'), 100);
+      setTimeout(() => downloadCanvasAsPNG(document.getElementById('icon128'), 'icon128.png'), 200);
+    }
+  </script>
+</body>
+</html>

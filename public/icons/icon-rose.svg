@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <!-- Soft background glow shadow -->
+  <rect x="16" y="20" width="96" height="96" rx="20" fill="#f43f5e" opacity="0.25" filter="url(#glow)"/>
+  
+  <!-- Notepad rounded body with premium gradient -->
+  <rect x="16" y="16" width="96" height="96" rx="20" fill="url(#bgGrad)"/>
+  
+  <!-- Outer metallic border line -->
+  <rect x="16.5" y="16.5" width="95" height="95" rx="19.5" stroke="white" stroke-opacity="0.15"/>
+  
+  <!-- Internal Paper sheet -->
+  <rect x="28" y="44" width="72" height="52" rx="6" fill="white"/>
+  
+  <!-- Paper lines -->
+  <line x1="38" y1="56" x2="90" y2="56" stroke="#be123c" stroke-width="3" stroke-linecap="round" opacity="0.3"/>
+  <line x1="38" y1="68" x2="80" y2="68" stroke="#be123c" stroke-width="3" stroke-linecap="round" opacity="0.3"/>
+  <line x1="38" y1="80" x2="86" y2="80" stroke="#be123c" stroke-width="3" stroke-linecap="round" opacity="0.3"/>
+
+  <!-- Metal Clip at the top -->
+  <rect x="48" y="10" width="32" height="16" rx="4" fill="url(#clipGrad)"/>
+  <rect x="56" y="14" width="16" height="8" rx="2" fill="#1e293b" opacity="0.2"/>
+
+  <defs>
+    <filter id="glow" x="0" y="4" width="128" height="128" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="6"/>
+      <feOffset dx="0" dy="4"/>
+      <feComposite in2="SourceAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.3 0"/>
+      <feBlend mode="normal" in2="SourceGraphic"/>
+    </filter>
+    <linearGradient id="bgGrad" x1="16" y1="16" x2="112" y2="112" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fb7185"/>
+      <stop offset="100%" stop-color="#be123c"/>
+    </linearGradient>
+    <linearGradient id="clipGrad" x1="48" y1="10" x2="80" y2="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#cbd5e1"/>
+      <stop offset="100%" stop-color="#94a3b8"/>
+    </linearGradient>
+  </defs>
+</svg>
