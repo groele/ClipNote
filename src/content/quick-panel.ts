@@ -341,7 +341,11 @@ export function initQuickPanel(): QuickPanelHandle {
     if (clips.length === 0) {
       const empty = document.createElement("div");
       empty.classList.add("clipnote-empty");
-      empty.textContent = "No clips yet. Select text and right-click to save.";
+      if (currentSearchQuery.trim() !== "") {
+        empty.textContent = `No matching clips found for "${truncate(currentSearchQuery, 20)}".`;
+      } else {
+        empty.textContent = "No clips yet. Select text and right-click to save.";
+      }
       list.appendChild(empty);
       return;
     }

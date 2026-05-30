@@ -117,13 +117,21 @@ export function initSelectionCapture(): SelectionCaptureHandle {
     showToast("Saved!", root);
   }
 
+  function handleKeyDown(e: KeyboardEvent) {
+    if (e.key === "Escape") {
+      hideButton();
+    }
+  }
+
   saveBtn.addEventListener("click", handleSaveClick);
   document.addEventListener("mouseup", handleMouseUp, true);
   document.addEventListener("mousedown", handleMouseDown, true);
+  document.addEventListener("keydown", handleKeyDown, true);
 
   function destroy() {
     document.removeEventListener("mouseup", handleMouseUp, true);
     document.removeEventListener("mousedown", handleMouseDown, true);
+    document.removeEventListener("keydown", handleKeyDown, true);
     if (hideTimeout) clearTimeout(hideTimeout);
     host.remove();
   }
