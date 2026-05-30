@@ -130,6 +130,23 @@ export function SidePanelApp() {
     [settings]
   );
 
+  const handleFabIconUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("File is too large! Please select an image under 2MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      handleSettingsChange({ customFabIcon: dataUrl });
+    };
+    reader.readAsDataURL(file);
+  }, [handleSettingsChange]);
+
   const handleNewNote = useCallback(() => {
     const note: Note = {
       id: crypto.randomUUID(),
@@ -243,6 +260,30 @@ export function SidePanelApp() {
                     <option value="rose">Rose (Crimson)</option>
                     <option value="amber">Amber (Sunset)</option>
                   </select>
+                </div>
+                <div className="settings-row">
+                  <div>
+                    <div className="settings-label">Custom Floating Button (FAB) Icon</div>
+                    <div className="settings-description">Upload your own SVG, PNG, or animated GIF for the FAB!</div>
+                  </div>
+                  <div className="settings-file-upload-wrapper">
+                    {settings.customFabIcon ? (
+                      <div className="settings-file-preview-container">
+                        <img className="settings-file-preview" src={settings.customFabIcon} alt="Custom FAB Icon" />
+                        <button className="settings-file-remove-btn" onClick={() => handleSettingsChange({ customFabIcon: undefined })}>Remove</button>
+                      </div>
+                    ) : (
+                      <label className="settings-file-upload-label">
+                        Upload Icon/GIF
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="settings-file-input"
+                          onChange={handleFabIconUpload}
+                        />
+                      </label>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="settings-section">

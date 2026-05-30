@@ -26,4 +26,5 @@ export interface AppSettings {
   autoTag: boolean;
   maxQuickClips: number;
   iconColor: "indigo" | "blue" | "green" | "rose" | "amber";
+  customFabIcon?: string;
 }

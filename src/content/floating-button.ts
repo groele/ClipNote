@@ -32,12 +32,40 @@ export function initFloatingButton(panel: QuickPanelHandle): FloatingButtonHandl
   const fab = document.createElement("button");
   fab.classList.add("clipnote-fab", "clipnote-fab--pulse");
   fab.setAttribute("aria-label", "ClipNote - Quick Notes");
-  fab.innerHTML = FAB_SVG;
 
   const tooltip = document.createElement("span");
   tooltip.classList.add("clipnote-fab-tooltip");
   tooltip.textContent = "ClipNote - Quick Notes";
-  fab.appendChild(tooltip);
+
+  // Set FAB icon dynamically based on settings
+  chrome.storage.local.get("settings").then((data) => {
+    const settings = data.settings;
+    if (settings && settings.customFabIcon) {
+      fab.innerHTML = `<img src="${settings.customFabIcon}" class="clipnote-fab-custom-img" style="width: 24px; height: 24px; border-radius: 50%; object-fit: contain; pointer-events: none;" />`;
+    } else {
+      fab.innerHTML = FAB_SVG;
+    }
+    fab.appendChild(tooltip);
+  }).catch(() => {
+    fab.innerHTML = FAB_SVG;
+    fab.appendChild(tooltip);
+  });
+
+  // Dynamic settings update listener
+  const storageListener = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
+    if (areaName === "local" && changes.settings) {
+      const newSettings = changes.settings.newValue;
+      if (newSettings) {
+        if (newSettings.customFabIcon) {
+          fab.innerHTML = `<img src="${newSettings.customFabIcon}" class="clipnote-fab-custom-img" style="width: 24px; height: 24px; border-radius: 50%; object-fit: contain; pointer-events: none;" />`;
+        } else {
+          fab.innerHTML = FAB_SVG;
+        }
+        fab.appendChild(tooltip);
+      }
+    }
+  };
+  chrome.storage.onChanged.addListener(storageListener);
 
   root.appendChild(fab);
   shadow.appendChild(styleEl);
@@ -152,6 +180,7 @@ export function initFloatingButton(panel: QuickPanelHandle): FloatingButtonHandl
   }
 
   function destroy() {
+    chrome.storage.onChanged.removeListener(storageListener);
     document.removeEventListener("mousemove", handleProximity, true);
     fab.removeEventListener("mousedown", handleMouseDown);
     window.removeEventListener("mousemove", handleMouseMove, true);
