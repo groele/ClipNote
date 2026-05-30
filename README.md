@@ -1,120 +1,183 @@
-# ClipNote - 极速双态剪贴笔记本 | Quick Notes & Markdown Notebook
+<div align="center">
 
-> **Browser-native clipboard manager and Markdown notebook Chrome extension.**
->
-> **网页原生极速剪贴板管理与浏览器侧边栏 Markdown 知识管理系统。**
+# ClipNote
 
----
+**浏览器原生的快速剪贴笔记与 Markdown 工作台**  
+*Browser-native quick capture, clipboard notes, and Markdown workspace for research reading.*
 
-## 📖 目录 | Table of Contents
-- [✨ 功能特色 | Features](#-功能特色--features)
-- [🛡️ 安全与沙箱隔离 | Security & Sandboxed Isolation](#️-安全与沙箱隔离--security--sandboxed-isolation)
-- [⚡ 性能与架构优化 | Performance & Optimization](#-性能与架构优化--performance--optimization)
-- [📂 目录结构 | Directory Structure](#-目录结构--directory-structure)
-- [🛠️ 安装与开发调试 | Installation & Development](#️-安装与开发调试--installation--development)
-- [📦 商店上架提审 | Chrome Web Store Publishing](#-商店上架提审--chrome-web-store-publishing)
+![Type](https://img.shields.io/badge/type-Chrome%20Extension-blue?style=flat-square)
+![Manifest](https://img.shields.io/badge/manifest-MV3-green?style=flat-square)
+![Language](https://img.shields.io/badge/language-TypeScript%20%2B%20React-blueviolet?style=flat-square)
+![Architecture](https://img.shields.io/badge/architecture-browser--native-purple?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)
 
----
+Part of **ResearchFlow Lab** — a local-first research productivity ecosystem for literature, manuscripts, data, and scientific visualization.
 
-## ✨ 功能特色 | Features
-
-### 1. 双态协同交互 | Dual-State Interactive Workflow
-* **网页端悬浮组件 (Webpage FAB & Panel)**:
-  * **智能微动感应气泡 (Proximity Aware FAB)**: 轻量化驻扎在网页边缘。鼠标远离时低沉半透明隐藏（`opacity: 0.35`），靠近时自动发光苏醒，带来极度舒适的无干扰阅读体验。
-  * **阻尼弹簧 Quick Notes 面板 (Elastic Spring Panel)**: 具备拖动定位并永久记住位置（Coordinates Persisted）能力。打开时拥有丝滑的物理过冲回弹动画。
-  * **智能吸附 (Smart Snapping)**: 拖动 FAB 时，面板会自动清空记忆坐标，完美吸附回 FAB 周围。
-* **侧边栏笔记本 (Side Panel Markdown Workspace)**:
-  * 完美集成的系统级双栏 Markdown 笔记本，支持全屏预览与极客级文档编辑，支持通过快捷键 **`Ctrl+Shift+K`** (Mac: **`Command+Shift+K`**) 瞬间呼出或关闭。
-
-### 2. 划词即存与全键盘友好 | Text Selection Capture & Keyboard Friendly
-* **划词悬浮气泡 (Selection Toast Button)**: 选中网页任意文字自动在光标处唤起“保存至 ClipNote”按钮。
-* **键盘一键打烊 (Escape Dismiss)**: 对于全键盘流效率达人，按下 **`Escape` 键** 可瞬间隐藏划词保存按钮或关闭 Quick Notes 搜索视图。
-
-### 3. 三级汇总备份与个性美学 | Summaries & Visual Customization
-* **周期汇总备份 (Day/Week/Month Backup)**: 后台服务线程自动整理历史剪贴，动态归档生成【日、周、月】三级 Markdown 汇总剪贴笔记并同步到 Inbox，让碎片知识化零为整。
-* **Toolbar 专属主题色彩 (Action Icon Theme)**: 提供五种精心调配的 logo 渐变微主题（Indigo 靛蓝、Emerald 祖母绿、Crimson 玫瑰红、Sunset 琥珀橙、Ocean 蔚海蓝），一键切换，同步更改浏览器栏的插件 Logo。
-* **自定义 FAB 图标与 GIF (Custom FAB Icon / GIF)**: 支持在后台设置面板上传您个人专属的 SVG, PNG, JPG 甚至 **动态 GIF** 作为网页悬浮气泡图标，网页侧实时响应，支持 2MB 内文件。
+</div>
 
 ---
 
-## 🛡️ 安全与沙箱隔离 | Security & Sandboxed Isolation
+## 01. Overview
 
-* **Visual Shield 隐私视觉防护盾**:
-  * **主动正则探测 (Sensitive Detection)**: 自动识别剪贴记录中的高危敏感字段（如各种账户密码、OpenAI/Stripe 等 API 密钥、证书私钥、信用卡号等）。
-  * **前台防窥遮罩 (Surveillance Shield)**: 默认以等宽小点 `••••••••••••` 呈现，并支持悬浮“小眼睛”图标随时一键明文切换，防止在视频会议、投屏、录屏时泄漏隐私。
-  * **效率无损一键复制 (Copy-on-Click)**: 直接点击卡片本身，无论当前处于遮罩还是明文状态，**依然会直接复制无污染的原始明文**！
-* **物理防泄漏沙箱 (Closed Mode Shadow DOM)**:
-  * 所有的宿主网页代码（包括 ChatGPT 等高强度 SPA 页面）**完全无法跨域嗅探** 您的剪贴内容。我们利用 `attachShadow({ mode: 'closed' })` 机制建立了严密的 DOM 隔绝层。
-  * 数据完全离线存储在 `chrome.storage.local` 沙箱与 IndexedDB 中，绝不上传任何服务器，安全百分百。
+**ClipNote** is a Chrome extension for fast capture inside the browser. It combines webpage text selection, quick clipboard snippets, floating notes, and a side-panel Markdown workspace into a local-first note-taking layer.
+
+**ClipNote** 是一个浏览器原生的剪贴笔记插件，面向论文阅读、网页资料整理、AI 对话摘录和临时想法捕获。它的目标不是替代完整知识库，而是让“看到一句有价值的话 → 保存 → 归档 → 汇总”这条路径足够轻。
 
 ---
 
-## ⚡ 性能与架构优化 | Performance & Optimization
+## 02. Why this project exists
 
-* **水合防删 DOM 重生守卫 (SPA Hydration Recovery)**:
-  * 针对 ChatGPT、Claude 等单页应用（SPA）极其激进的 React 客户端水合（Hydration）删除非 React 节点的问题，我们利用 **`MutationObserver`** 在 Microtask 级别建立了插回重绘守卫，一旦 React 将我们的插件容器节点从 body 中剔除，守卫会瞬间重新将其补回 body 底部，保证组件永久稳定显示。
-* **毫秒级内存缓存检索 (Synchronous Caching Search)**:
-  * 摒弃了在每次输入查询字符时都读写异步 `chrome.storage.local` API 的陈旧做法，我们构建了内存级 `allClips` 动态数组。打字搜索的响应时间缩短至 **<1ms**，完全解决打字时的 Stutter（掉帧）与延迟。
-* **DOM 拦截防锁死机制 (Focus & Drag Separation)**:
-  * 在 Header 的鼠标拖拽 `mousedown` 事件中实现了智能标签/容器过滤，对所有 `INPUT`、`BUTTON` 以及 `.clipnote-panel__search-container` 实施穿透释放，彻底解决了“一搜索输入框就被锁死无法编辑、卡顿”的交互冲突问题。
-* **重载防污染净化 (Multi-Instance Clean Purge)**:
-  * 初始化最前端强行检测并清除之前版本残留在 DOM 中的 Stale Nodes，杜绝开发热更新或插件升级带来的多事件绑定和死锁。
+Research reading often happens in small fragments: a sentence from a paper, a method description from a webpage, a useful prompt from an AI chat, or a temporary note during manuscript writing. These fragments are easy to lose when they are copied into scattered editors, chat boxes, or temporary files.
+
+ClipNote provides a browser-side capture layer for those fragments.
+
+核心目标：
+
+- Reduce friction between reading and note capture.
+- Keep quick notes available without leaving the browser.
+- Support Markdown-based organization for research snippets.
+- Protect sensitive clipboard content through local-first storage and visual masking.
+- Provide a future bridge into ResearchFlow projects and literature records.
 
 ---
 
-## 📂 目录结构 | Directory Structure
+## 03. Key features
 
+| Module | What it does | 中文说明 |
+|---|---|---|
+| Floating FAB | Provides a low-interruption floating entry point on webpages | 在网页侧边提供低干扰悬浮入口 |
+| Quick Notes Panel | Captures and searches short clipboard notes without switching apps | 快速保存、搜索和复制剪贴片段 |
+| Selection Capture | Saves selected webpage text through a contextual capture button | 网页划词后直接保存为剪贴笔记 |
+| Side Panel Workspace | Provides a Markdown notebook inside the browser side panel | 浏览器侧边栏 Markdown 笔记本 |
+| Periodic Summaries | Generates daily, weekly, and monthly Markdown summaries | 自动生成日、周、月剪贴汇总 |
+| Sensitive Masking | Detects and visually masks keys, passwords, and high-risk snippets | 对密钥、密码等敏感内容进行视觉遮罩 |
+| Local Storage | Stores data in browser-local storage and IndexedDB | 使用浏览器本地存储和 IndexedDB 保存数据 |
+| Theme Customization | Supports theme colors and custom FAB icons | 支持主题色和自定义悬浮图标 |
+
+---
+
+## 04. Product philosophy
+
+ClipNote follows four design principles:
+
+1. **Capture first** — saving a useful fragment should be faster than opening a separate note app.
+2. **Browser-native** — the tool should live where reading and copying happen.
+3. **Local-first** — snippets should remain private unless the user explicitly exports or syncs them.
+4. **Composable** — quick notes should be able to flow into ResearchFlow, Zotero, Markdown, or manuscript workflows.
+
+---
+
+## 05. Architecture
+
+```text
+ClipNote
+├── Manifest V3 Extension
+│   ├── background service worker
+│   ├── content script / floating FAB
+│   ├── side panel / Markdown workspace
+│   └── shared message bus
+├── Capture Layer
+│   ├── clipboard notes
+│   ├── webpage text selection
+│   ├── quick search
+│   └── periodic summaries
+├── Data Layer
+│   ├── chrome.storage.local
+│   ├── IndexedDB
+│   └── exportable Markdown records
+└── Privacy Layer
+    ├── sensitive-pattern detection
+    ├── visual masking
+    └── closed Shadow DOM isolation
 ```
-clipnote-extension/
-├── src/
-│   ├── background/      # 后台 Service Worker (广播通信与聚合备份流水线)
-│   ├── content/         # 网页注入 Context 世界 (FAB, Quick Panel, 划词捕获)
-│   ├── sidepanel/       # 侧边栏笔记本 (React + React Hooks Markdown Workspace)
-│   ├── shared/          # 共享基础类、MessageBus 通信总线与类型定义
-│   └── storage/         # 离线 IndexedDB 及 Settings 同步层
-├── dist/                # 编译打包输出目录 (打包出厂产物)
-├── manifest.json        # 谷歌 Manifest V3 核心声明配置文件
-├── package.json         # 项目依赖与 Vite 编译脚本
-└── tsconfig.json        # TypeScript 编译器规则
-```
 
 ---
 
-## 🛠️ 安装与开发调试 | Installation & Development
+## 06. Quick start
 
-### 1. 克隆并安装依赖 | Clone and Install Dependencies
 ```bash
-# 进入项目目录
-cd clipnote-extension
-
-# 安装模块
+git clone https://github.com/groele/ClipNote.git
+cd ClipNote
 npm install
-```
-
-### 2. 编译打包 | Build
-```bash
-# 使用 TypeScript 与 Vite 进行三端生产级打包
 npm run build
 ```
-打包成功后，完整的插件内容将输出至 `dist/` 文件夹。
 
-### 3. 加载到浏览器中 | Load in Browser
-1. 打开 Chrome 浏览器，访问 **`chrome://extensions/`**。
-2. 开启右上角的 **“开发者模式” (Developer Mode)**。
-3. 点击左上角的 **“加载已解压的扩展程序” (Load unpacked)**。
-4. 选择我们编译产出的 **`dist/`** 目录。
+Then load the extension in Chrome:
 
----
-
-## 📦 商店上架提审 | Chrome Web Store Publishing
-
-如果您想将该插件分享给所有人，可以直接使用项目根目录下的 **`clipnote-extension.zip`** 提审至谷歌商店。
-
-提审时的**详细文案（中英详细说明）**与**Manifest V3 权限合规理由陈述**已为您完整拟定在本地提审指南中：
-👉 [chrome_web_store_publishing_guide.md](file:///C:/Users/gro_e/.gemini/antigravity/brain/e8d91b1e-c7a9-45e0-b291-84a7930b200e/chrome_web_store_publishing_guide.md)
+1. Open `chrome://extensions/`.
+2. Enable **Developer mode**.
+3. Click **Load unpacked**.
+4. Select the generated `dist/` folder.
 
 ---
 
-## 📄 开源许可证 | License
+## 07. Recommended workflow
 
-MIT License. Developed with ❤️ by groele.
+```text
+Read webpage / paper → Select useful text → Save to ClipNote
+                     → Search / reuse snippets
+                     → Generate daily or weekly Markdown summaries
+                     → Move important notes into ResearchFlow or manuscript drafts
+```
+
+Typical use cases:
+
+- Capture useful sentences while reading papers.
+- Store temporary AI prompts and responses.
+- Keep reusable manuscript phrases or methods descriptions.
+- Build lightweight daily research logs.
+
+---
+
+## 08. Project structure
+
+```text
+ClipNote
+├── src/
+│   ├── background/
+│   ├── content/
+│   ├── sidepanel/
+│   ├── shared/
+│   └── storage/
+├── dist/
+├── manifest.json
+├── package.json
+├── tsconfig.json
+└── README.md
+```
+
+---
+
+## 09. Roadmap
+
+- [ ] Project-level folders and uncategorized inbox
+- [ ] Better Markdown export and import
+- [ ] Optional ResearchFlow project linking
+- [ ] Zotero note export bridge
+- [ ] Conflict-safe backup format
+- [ ] More precise sensitive-content detection
+- [ ] Keyboard-first capture workflow
+
+---
+
+## 10. Privacy and data ownership
+
+ClipNote is designed as a **local-first** browser tool. Notes are stored locally unless the user explicitly exports or syncs them. Sensitive-content masking is a visual protection layer and should not be treated as cryptographic encryption.
+
+---
+
+## 11. Related projects
+
+- **ResearchFlow Companion** — research workflow operating system
+- **PaperPilot Pro** — academic search and publisher-page enhancement
+- **ManuGuide** — Microsoft Word manuscript formatting and style checker
+- **Witec-Matlab** — spectroscopy data analysis workflow
+- **Scientific Color Lab** — scientific color and visualization workspace
+
+---
+
+## 12. License
+
+MIT License.
+
+Developed by **Shikun Hou / groele**.
