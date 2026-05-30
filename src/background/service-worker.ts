@@ -14,6 +14,39 @@ chrome.runtime.onInstalled.addListener(async () => {
     title: "Save to ClipNote",
     contexts: ["selection"],
   });
+
+  // Dynamically inject content scripts into already opened HTTP/HTTPS tabs
+  try {
+    const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+    for (const tab of tabs) {
+      if (tab.id && tab.url) {
+        // Skip browser internal pages
+        if (
+          tab.url.startsWith("chrome://") ||
+          tab.url.startsWith("chrome-extension://") ||
+          tab.url.startsWith("edge://") ||
+          tab.url.startsWith("about:")
+        ) {
+          continue;
+        }
+
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ["content.js"],
+          });
+          await chrome.scripting.insertCSS({
+            target: { tabId: tab.id },
+            files: ["content.css"],
+          });
+        } catch (err) {
+          console.warn(`Failed to inject content scripts into tab ${tab.id} (${tab.url}):`, err);
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Failed to query tabs for automatic injection:", e);
+  }
 });
 
 async function saveClipAndNote(payload: { text: string; url?: string; title?: string; timestamp: number }) {
