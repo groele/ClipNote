@@ -98,7 +98,18 @@ export function SidePanelApp() {
       try {
         const data = JSON.parse(event.target?.result as string);
         if (data.notes) {
-          const merged = [...(data.notes as Note[]), ...notes];
+          const standardizedNotes: Note[] = (data.notes as any[]).map((n) => ({
+            id: n.id || crypto.randomUUID(),
+            title: n.title || "Untitled Note",
+            markdown: n.markdown || "",
+            plainText: n.plainText || n.markdown || "",
+            tags: Array.isArray(n.tags) ? n.tags : [],
+            projectId: n.projectId || "Inbox",
+            status: n.status || "inbox",
+            createdAt: n.createdAt || Date.now(),
+            updatedAt: n.updatedAt || Date.now()
+          }));
+          const merged = [...standardizedNotes, ...notes];
           const unique = merged.filter((n, i, arr) => arr.findIndex((x) => x.id === n.id) === i);
           setNotes(unique);
           await chrome.storage.local.set({ notes: unique });
@@ -107,8 +118,15 @@ export function SidePanelApp() {
           }
         }
         if (data.clips) {
-          await chrome.storage.local.set({ clips: data.clips });
-          for (const clip of data.clips) {
+          const standardizedClips = (data.clips as any[]).map((c) => ({
+            id: c.id || crypto.randomUUID(),
+            text: c.text || "",
+            sourceUrl: c.sourceUrl || c.url || "",
+            sourceTitle: c.sourceTitle || c.title || "",
+            capturedAt: c.capturedAt || c.timestamp || Date.now()
+          }));
+          await chrome.storage.local.set({ clips: standardizedClips });
+          for (const clip of standardizedClips) {
             await db.addClip(clip);
           }
         }

@@ -77,12 +77,26 @@ export function renderMarkdown(input: string): string {
   return html;
 }
 
+function sanitizeUrl(url: string): string {
+  const trimmed = url.trim().toLowerCase();
+  if (
+    trimmed.startsWith("javascript:") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("vbscript:")
+  ) {
+    return "#";
+  }
+  return url;
+}
+
 function inline(text: string): string {
   let result = escapeHtml(text);
   result = result.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   result = result.replace(/\*(.+?)\*/g, "<em>$1</em>");
   result = result.replace(/`([^`]+)`/g, "<code>$1</code>");
-  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, textContent, url) => {
+    return `<a href="${sanitizeUrl(url)}" target="_blank" rel="noopener noreferrer">${textContent}</a>`;
+  });
   return result;
 }
 

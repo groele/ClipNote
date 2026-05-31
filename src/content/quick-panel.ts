@@ -10,6 +10,7 @@ export interface QuickPanelHandle {
   toggle: (fabRect?: DOMRect) => void;
   refresh: () => void;
   isOpen: () => boolean;
+  destroy: () => void;
 }
 
 function getDomain(url: string): string {
@@ -248,7 +249,7 @@ export function initQuickPanel(): QuickPanelHandle {
     e.preventDefault();
   });
 
-  window.addEventListener("mousemove", (e) => {
+  const handlePanelMouseMove = (e: MouseEvent) => {
     if (!isPanelDragging) return;
 
     const dx = e.clientX - panelStartX;
@@ -270,9 +271,9 @@ export function initQuickPanel(): QuickPanelHandle {
     panel.style.right = "auto";
     panel.style.left = `${newLeft}px`;
     panel.style.top = `${newTop}px`;
-  });
+  };
 
-  window.addEventListener("mouseup", async () => {
+  const handlePanelMouseUp = async () => {
     if (!isPanelDragging) return;
     isPanelDragging = false;
 
@@ -285,7 +286,10 @@ export function initQuickPanel(): QuickPanelHandle {
     } catch {
       // Extension context invalidated
     }
-  });
+  };
+
+  window.addEventListener("mousemove", handlePanelMouseMove, true);
+  window.addEventListener("mouseup", handlePanelMouseUp, true);
 
   async function handleSave() {
     const text = textarea.value.trim();
@@ -567,5 +571,12 @@ export function initQuickPanel(): QuickPanelHandle {
     loadClips(true);
   }
 
-  return { element: host, open, close, toggle, refresh, isOpen };
+  function destroy() {
+    chrome.storage.onChanged.removeListener(storageListener);
+    window.removeEventListener("mousemove", handlePanelMouseMove, true);
+    window.removeEventListener("mouseup", handlePanelMouseUp, true);
+    host.remove();
+  }
+
+  return { element: host, open, close, toggle, refresh, isOpen, destroy };
 }

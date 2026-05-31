@@ -190,7 +190,7 @@ function main() {
     }
     selection.destroy();
     fab.destroy();
-    panel.element.remove();
+    panel.destroy();
     delete (window as any)[INIT_FLAG];
   }
 }
