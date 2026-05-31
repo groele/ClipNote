@@ -235,13 +235,21 @@ export function SidePanelApp() {
       list = list.filter((n) => (n.projectId || "Inbox") === selectedNotebook);
     }
     if (!searchQuery.trim()) return list;
-    const q = searchQuery.toLowerCase();
-    return list.filter(
-      (n) =>
-        n.title.toLowerCase().includes(q) ||
-        n.plainText.toLowerCase().includes(q) ||
-        n.tags.some((t) => t.toLowerCase().includes(q))
-    );
+    const keywords = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
+    if (keywords.length === 0) return list;
+    return list.filter((n) => {
+      const title = n.title.toLowerCase();
+      const plainText = n.plainText.toLowerCase();
+      const tags = n.tags.map((t) => t.toLowerCase());
+      const notebook = (n.projectId || "Inbox").toLowerCase();
+      return keywords.every(
+        (kw) =>
+          title.includes(kw) ||
+          plainText.includes(kw) ||
+          tags.some((t) => t.includes(kw)) ||
+          notebook.includes(kw)
+      );
+    });
   }, [notes, searchQuery, selectedNotebook]);
 
   const handleSelectNote = useCallback((note: Note) => {

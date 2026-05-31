@@ -6,6 +6,45 @@ import { suggestTags } from "../shared/tagger";
 
 const CONTEXT_MENU_ID = "clipnote-save-selection";
 
+class TaskQueue {
+  private queue: (() => Promise<any>)[] = [];
+  private running = false;
+
+  get length(): number {
+    return this.queue.length;
+  }
+
+  async add<T>(task: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      this.queue.push(async () => {
+        try {
+          resolve(await task());
+        } catch (err) {
+          reject(err);
+        }
+      });
+      this.runNext();
+    });
+  }
+
+  private async runNext() {
+    if (this.running || this.queue.length === 0) return;
+    this.running = true;
+    const task = this.queue.shift();
+    if (task) {
+      try {
+        await task();
+      } catch (e) {
+        console.error("TaskQueue error executing task:", e);
+      }
+    }
+    this.running = false;
+    this.runNext();
+  }
+}
+
+const storageQueue = new TaskQueue();
+
 /**
  * Dynamically inject content scripts into all already-open HTTP/HTTPS tabs.
  * Called on both onInstalled (extension install/update/reload) and
@@ -129,11 +168,13 @@ async function saveClipAndNote(payload: { text: string; url?: string; title?: st
   notes.unshift(newNote);
   await chrome.storage.local.set({ notes });
 
-  // 3b. Generate/Update Day, Week, and Month summaries
-  try {
-    await updatePeriodicSummaries(payload.timestamp);
-  } catch (e) {
-    console.error("Failed to update periodic summaries:", e);
+  // 3b. Generate/Update Day, Week, and Month summaries (only execute on the last queued task)
+  if (storageQueue.length === 0) {
+    try {
+      await updatePeriodicSummaries(payload.timestamp);
+    } catch (e) {
+      console.error("Failed to update periodic summaries:", e);
+    }
   }
 
   // 4. Notify components
@@ -171,12 +212,14 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   if (!text.trim()) return;
 
-  await saveClipAndNote({
-    text: text,
-    url: tab?.url,
-    title: tab?.title,
-    timestamp: Date.now(),
-  });
+  await storageQueue.add(() =>
+    saveClipAndNote({
+      text: text,
+      url: tab?.url,
+      title: tab?.title,
+      timestamp: Date.now(),
+    })
+  );
 });
 
 onMessage(MessageType.CLIP_SAVED, async (clip: Clip) => {
@@ -188,7 +231,7 @@ onMessage(MessageType.CLIP_SAVED, async (clip: Clip) => {
 });
 
 onMessage(MessageType.SAVE_CLIP, async (payload: { text: string; url: string; title: string; timestamp: number }) => {
-  await saveClipAndNote(payload);
+  await storageQueue.add(() => saveClipAndNote(payload));
 });
 
 onMessage(MessageType.OPEN_SIDEBAR, async () => {

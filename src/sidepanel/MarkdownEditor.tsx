@@ -97,7 +97,12 @@ export function MarkdownEditor({ note, notebooks, onChange }: MarkdownEditorProp
 
       requestAnimationFrame(() => {
         textarea.focus();
-        const cursorPos = start + before.length + selected.length;
+        let cursorPos;
+        if (selected.length > 0) {
+          cursorPos = start + before.length + selected.length + after.length;
+        } else {
+          cursorPos = start + before.length;
+        }
         textarea.setSelectionRange(cursorPos, cursorPos);
       });
     },
