@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { renderMarkdown } from "../shared/markdown";
 import type { Note } from "../shared/types";
+import { db } from "../storage/indexeddb";
 
 interface MarkdownEditorProps {
   note: Note;
@@ -31,6 +32,9 @@ export function MarkdownEditor({ note, notebooks, onChange }: MarkdownEditorProp
             chrome.storage.local.set({ notes });
           }
         });
+        db.updateNote(updated).catch((err) =>
+          console.error("Failed to sync auto-save note to IndexedDB:", err)
+        );
       }, 500);
     },
     [note, onChange]

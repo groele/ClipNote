@@ -1,13 +1,7 @@
 import { MessageType, sendMessage } from "../shared/message-bus";
+import { db } from "../storage/indexeddb";
+import type { Clip } from "../shared/types";
 import contentStyles from "./content.css?inline";
-
-interface Clip {
-  id: string;
-  text: string;
-  url: string;
-  title: string;
-  timestamp: number;
-}
 
 export interface QuickPanelHandle {
   element: HTMLElement;
@@ -313,7 +307,12 @@ export function initQuickPanel(): QuickPanelHandle {
     let clips = allClips;
     if (currentSearchQuery.trim() !== "") {
       const query = currentSearchQuery.toLowerCase();
-      clips = clips.filter((clip) => clip.text.toLowerCase().includes(query));
+      clips = clips.filter(
+        (clip) =>
+          clip.text.toLowerCase().includes(query) ||
+          (clip.sourceUrl && clip.sourceUrl.toLowerCase().includes(query)) ||
+          (clip.sourceTitle && clip.sourceTitle.toLowerCase().includes(query))
+      );
     }
     renderClips(clips);
   }
@@ -338,6 +337,11 @@ export function initQuickPanel(): QuickPanelHandle {
       const clips: Clip[] = result.clips ?? [];
       const filtered = clips.filter((c) => c.id !== id);
       await chrome.storage.local.set({ clips: filtered });
+      try {
+        await db.deleteClip(id);
+      } catch (dbErr) {
+        console.error("Failed to delete clip from IndexedDB:", dbErr);
+      }
       allClips = filtered;
       loadClips(false);
     } catch {
@@ -403,12 +407,12 @@ export function initQuickPanel(): QuickPanelHandle {
 
       const domain = document.createElement("span");
       domain.classList.add("clipnote-note__domain");
-      domain.textContent = getDomain(clip.url);
-      domain.title = clip.url;
+      domain.textContent = getDomain(clip.sourceUrl || "");
+      domain.title = clip.sourceUrl || "";
 
       const time = document.createElement("span");
       time.classList.add("clipnote-note__time");
-      time.textContent = relativeTime(clip.timestamp);
+      time.textContent = relativeTime(clip.capturedAt);
 
       // Eye Reveal Button for Sensitive Content
       let revealBtn: HTMLButtonElement | null = null;

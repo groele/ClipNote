@@ -32,10 +32,12 @@ export function initFloatingButton(panel: QuickPanelHandle): FloatingButtonHandl
   const fab = document.createElement("button");
   fab.classList.add("clipnote-fab", "clipnote-fab--pulse");
   fab.setAttribute("aria-label", "ClipNote - Quick Notes");
+  fab.innerHTML = FAB_SVG;
 
   const tooltip = document.createElement("span");
   tooltip.classList.add("clipnote-fab-tooltip");
   tooltip.textContent = "ClipNote - Quick Notes";
+  fab.appendChild(tooltip);
 
   let currentSettings: any = {};
 
@@ -67,10 +69,9 @@ export function initFloatingButton(panel: QuickPanelHandle): FloatingButtonHandl
 
   // Set FAB icon dynamically based on settings
   chrome.storage.local.get("settings").then((data) => {
-    applySettings(data.settings);
+    applySettings(data.settings || {});
   }).catch(() => {
-    fab.innerHTML = FAB_SVG;
-    fab.appendChild(tooltip);
+    applySettings({});
   });
 
   // Dynamic settings update listener

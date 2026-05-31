@@ -2,6 +2,7 @@ import { MessageType, onMessage } from "../shared/message-bus";
 import type { Clip, Note } from "../shared/types";
 import { db } from "../storage/indexeddb";
 import { getSettings, saveSettings } from "../storage/sync-settings";
+import { suggestTags } from "../shared/tagger";
 
 const CONTEXT_MENU_ID = "clipnote-save-selection";
 
@@ -93,6 +94,16 @@ async function saveClipAndNote(payload: { text: string; url?: string; title?: st
 
   // 3. Create and save corresponding Note
   const title = payload.text.trim().split("\n")[0].slice(0, 50) || "Quick Clip";
+  const tags = ["clip"];
+  if (settings.autoTag !== false) {
+    const autoTags = suggestTags(payload.text);
+    autoTags.forEach((t) => {
+      if (!tags.includes(t)) {
+        tags.push(t);
+      }
+    });
+  }
+
   const newNote: Note = {
     id: crypto.randomUUID(),
     title: title,
@@ -100,7 +111,7 @@ async function saveClipAndNote(payload: { text: string; url?: string; title?: st
     plainText: payload.text,
     sourceUrl: payload.url,
     sourceTitle: payload.title,
-    tags: ["clip"],
+    tags: tags,
     status: "inbox",
     createdAt: payload.timestamp,
     updatedAt: payload.timestamp,

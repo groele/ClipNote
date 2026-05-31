@@ -3,6 +3,7 @@ import type { Note, AppSettings } from "../shared/types";
 import { SearchBar } from "./SearchBar";
 import { NoteList } from "./NoteList";
 import { MarkdownEditor } from "./MarkdownEditor";
+import { db } from "../storage/indexeddb";
 
 type ActiveView = "list" | "editor" | "settings";
 
@@ -101,9 +102,15 @@ export function SidePanelApp() {
           const unique = merged.filter((n, i, arr) => arr.findIndex((x) => x.id === n.id) === i);
           setNotes(unique);
           await chrome.storage.local.set({ notes: unique });
+          for (const note of unique) {
+            await db.addNote(note);
+          }
         }
         if (data.clips) {
           await chrome.storage.local.set({ clips: data.clips });
+          for (const clip of data.clips) {
+            await db.addClip(clip);
+          }
         }
         if (data.settings) {
           const merged = { ...settings, ...data.settings };
@@ -124,6 +131,7 @@ export function SidePanelApp() {
   const handleClearAllData = useCallback(async () => {
     if (!confirm("⚠️ Are you sure you want to delete ALL ClipNote data? This cannot be undone.")) return;
     await chrome.storage.local.clear();
+    await db.clearAll();
     setNotes([]);
     setSettings(DEFAULT_SETTINGS);
     await chrome.storage.local.set({ settings: DEFAULT_SETTINGS });
@@ -152,6 +160,13 @@ export function SidePanelApp() {
       );
       setNotes(nextNotes);
       chrome.storage.local.set({ notes: nextNotes });
+      
+      // Synchronize migrated notes to IndexedDB
+      nextNotes.forEach((note) => {
+        if (note.projectId === "Inbox") {
+          db.updateNote(note).catch((err) => console.error("Failed to sync migrated note to IndexedDB:", err));
+        }
+      });
       
       if (selectedNotebook === name) {
         setSelectedNotebook("All");
@@ -222,10 +237,15 @@ export function SidePanelApp() {
   }, []);
 
   const handleDeleteNote = useCallback(
-    (id: string) => {
+    async (id: string) => {
       const next = notes.filter((n) => n.id !== id);
       setNotes(next);
-      chrome.storage.local.set({ notes: next });
+      await chrome.storage.local.set({ notes: next });
+      try {
+        await db.deleteNote(id);
+      } catch (err) {
+        console.error("Failed to delete note from IndexedDB:", err);
+      }
       if (selectedNote?.id === id) {
         setSelectedNote(null);
         setActiveView("list");
@@ -235,32 +255,48 @@ export function SidePanelApp() {
   );
 
   const handleToggleFavorite = useCallback(
-    (id: string) => {
+    async (id: string) => {
       const next = notes.map((n) =>
         n.id === id
           ? { ...n, status: (n.status === "favorite" ? "inbox" : "favorite") as Note["status"], updatedAt: Date.now() }
           : n
       );
       setNotes(next);
-      chrome.storage.local.set({ notes: next });
+      await chrome.storage.local.set({ notes: next });
+      const updated = next.find((n) => n.id === id);
+      if (updated) {
+        try {
+          await db.updateNote(updated);
+        } catch (err) {
+          console.error("Failed to sync note status to IndexedDB:", err);
+        }
+      }
       if (selectedNote?.id === id) {
-        setSelectedNote(next.find((n) => n.id === id) || null);
+        setSelectedNote(updated || null);
       }
     },
     [notes, selectedNote]
   );
 
   const handleArchive = useCallback(
-    (id: string) => {
+    async (id: string) => {
       const next = notes.map((n) =>
         n.id === id
           ? { ...n, status: (n.status === "archived" ? "inbox" : "archived") as Note["status"], updatedAt: Date.now() }
           : n
       );
       setNotes(next);
-      chrome.storage.local.set({ notes: next });
+      await chrome.storage.local.set({ notes: next });
+      const updated = next.find((n) => n.id === id);
+      if (updated) {
+        try {
+          await db.updateNote(updated);
+        } catch (err) {
+          console.error("Failed to sync note status to IndexedDB:", err);
+        }
+      }
       if (selectedNote?.id === id) {
-        setSelectedNote(next.find((n) => n.id === id) || null);
+        setSelectedNote(updated || null);
       }
     },
     [notes, selectedNote]
@@ -292,7 +328,7 @@ export function SidePanelApp() {
     reader.readAsDataURL(file);
   }, [handleSettingsChange]);
 
-  const handleNewNote = useCallback(() => {
+  const handleNewNote = useCallback(async () => {
     const note: Note = {
       id: crypto.randomUUID(),
       title: "",
@@ -306,7 +342,12 @@ export function SidePanelApp() {
     };
     const next = [note, ...notes];
     setNotes(next);
-    chrome.storage.local.set({ notes: next });
+    await chrome.storage.local.set({ notes: next });
+    try {
+      await db.addNote(note);
+    } catch (err) {
+      console.error("Failed to add note to IndexedDB:", err);
+    }
     setSelectedNote(note);
     setActiveView("editor");
   }, [notes, selectedNotebook]);

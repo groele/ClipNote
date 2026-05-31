@@ -95,5 +95,12 @@ export const db = {
 
   deleteClip(id: string): Promise<void> {
     return txRequest("clips", "readwrite", store => store.delete(id)).then(() => {});
+  },
+
+  clearAll(): Promise<void> {
+    return Promise.all([
+      txRequest("notes", "readwrite", store => store.clear()),
+      txRequest("clips", "readwrite", store => store.clear())
+    ]).then(() => {});
   }
 };
