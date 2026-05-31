@@ -46,6 +46,24 @@ export function initSelectionCapture(): SelectionCaptureHandle {
   shadow.appendChild(styleEl);
   shadow.appendChild(root);
 
+  let currentSettings: any = {};
+
+  chrome.storage.local.get("settings").then((data) => {
+    if (data.settings) {
+      currentSettings = data.settings;
+    }
+  }).catch(() => {});
+
+  const storageListener = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
+    if (areaName === "local" && changes.settings) {
+      currentSettings = changes.settings.newValue || {};
+      if (currentSettings.showSelectionCapture === false) {
+        hideButton();
+      }
+    }
+  };
+  chrome.storage.onChanged.addListener(storageListener);
+
   let hideTimeout: ReturnType<typeof setTimeout> | null = null;
 
   function positionButton(x: number, y: number) {
@@ -73,6 +91,12 @@ export function initSelectionCapture(): SelectionCaptureHandle {
   function handleMouseUp(e: MouseEvent) {
     // Ignore clicks on our own UI
     if (host.contains(e.target as Node)) return;
+
+    // Skip if selection capture is disabled
+    if (currentSettings.showSelectionCapture === false) {
+      hideButton();
+      return;
+    }
 
     const selection = window.getSelection();
     const text = selection?.toString().trim();
@@ -128,6 +152,7 @@ export function initSelectionCapture(): SelectionCaptureHandle {
   document.addEventListener("keydown", handleKeyDown, true);
 
   function destroy() {
+    chrome.storage.onChanged.removeListener(storageListener);
     document.removeEventListener("mouseup", handleMouseUp, true);
     document.removeEventListener("mousedown", handleMouseDown, true);
     document.removeEventListener("keydown", handleKeyDown, true);

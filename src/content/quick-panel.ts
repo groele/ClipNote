@@ -133,6 +133,24 @@ export function initQuickPanel(): QuickPanelHandle {
   let currentSearchQuery = "";
   const revealedClipIds = new Set<string>();
   let allClips: Clip[] = [];
+  let appSettings: any = { enablePrivacyMask: true };
+
+  // Load settings
+  chrome.storage.local.get("settings").then((data) => {
+    if (data.settings) {
+      appSettings = { ...appSettings, ...data.settings };
+      loadClips(true);
+    }
+  }).catch(() => {});
+
+  // Listen for changes
+  const storageListener = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
+    if (areaName === "local" && changes.settings) {
+      appSettings = { ...appSettings, ...changes.settings.newValue };
+      loadClips(false);
+    }
+  };
+  chrome.storage.onChanged.addListener(storageListener);
 
   searchBtn.addEventListener("click", () => {
     isSearching = !isSearching;
@@ -370,7 +388,7 @@ export function initQuickPanel(): QuickPanelHandle {
       const textEl = document.createElement("p");
       textEl.classList.add("clipnote-note__text");
 
-      const sensitive = isSensitive(clip.text);
+      const sensitive = appSettings.enablePrivacyMask !== false && isSensitive(clip.text);
       const isRevealed = revealedClipIds.has(clip.id);
 
       if (sensitive && !isRevealed) {

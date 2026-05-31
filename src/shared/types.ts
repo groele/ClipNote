@@ -27,4 +27,10 @@ export interface AppSettings {
   maxQuickClips: number;
   iconColor: "indigo" | "blue" | "green" | "rose" | "amber";
   customFabIcon?: string;
+  fabOpacity: number;
+  fabSize: number;
+  showSelectionCapture: boolean;
+  showFab: boolean;
+  enablePrivacyMask: boolean;
+  enableProximityAwareness: boolean;
 }

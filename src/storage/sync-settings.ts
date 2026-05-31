@@ -5,8 +5,14 @@ const SETTINGS_KEY = "clipnote-settings";
 const DEFAULTS: AppSettings = {
   theme: "auto",
   autoTag: true,
-  maxQuickClips: 50,
+  maxQuickClips: 20,
   iconColor: "indigo",
+  fabOpacity: 35,
+  fabSize: 48,
+  showSelectionCapture: true,
+  showFab: true,
+  enablePrivacyMask: true,
+  enableProximityAwareness: true,
 };
 
 export async function getSettings(): Promise<AppSettings> {

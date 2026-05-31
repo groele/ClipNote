@@ -11,6 +11,12 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoTag: true,
   maxQuickClips: 20,
   iconColor: "indigo",
+  fabOpacity: 35,
+  fabSize: 48,
+  showSelectionCapture: true,
+  showFab: true,
+  enablePrivacyMask: true,
+  enableProximityAwareness: true,
 };
 
 export function SidePanelApp() {
@@ -20,6 +26,106 @@ export function SidePanelApp() {
   const [activeView, setActiveView] = useState<ActiveView>("list");
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [stats, setStats] = useState({ totalNotes: 0, totalClips: 0, storageUsed: "0 KB" });
+  const [exportStatus, setExportStatus] = useState("");
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const data = await chrome.storage.local.get(["clips", "notes"]);
+        const clips = data.clips ?? [];
+        const notesList = data.notes ?? [];
+        const storageBytes = JSON.stringify(data).length;
+        const storageStr = storageBytes < 1024 ? `${storageBytes} B`
+          : storageBytes < 1024 * 1024 ? `${(storageBytes / 1024).toFixed(1)} KB`
+          : `${(storageBytes / (1024 * 1024)).toFixed(1)} MB`;
+        setStats({ totalNotes: notesList.length, totalClips: clips.length, storageUsed: storageStr });
+      } catch {}
+    }
+    loadStats();
+  }, [notes]);
+
+  const handleExportJSON = useCallback(async () => {
+    try {
+      const data = await chrome.storage.local.get(["clips", "notes", "settings"]);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `clipnote-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setExportStatus("✅ Exported successfully!");
+      setTimeout(() => setExportStatus(""), 3000);
+    } catch (e) {
+      setExportStatus("❌ Export failed");
+      setTimeout(() => setExportStatus(""), 3000);
+    }
+  }, []);
+
+  const handleExportMarkdown = useCallback(async () => {
+    try {
+      const data = await chrome.storage.local.get("notes");
+      const allNotes: Note[] = data.notes ?? [];
+      const md = allNotes.map((n) =>
+        `# ${n.title || "Untitled"}\n\n${n.markdown}\n\n---\n*Source: ${n.sourceUrl || "N/A"} | Created: ${new Date(n.createdAt).toLocaleString()}*\n`
+      ).join("\n\n");
+      const blob = new Blob([md], { type: "text/markdown" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `clipnote-notes-${new Date().toISOString().slice(0, 10)}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setExportStatus("✅ Markdown exported!");
+      setTimeout(() => setExportStatus(""), 3000);
+    } catch {
+      setExportStatus("❌ Export failed");
+      setTimeout(() => setExportStatus(""), 3000);
+    }
+  }, []);
+
+  const handleImportJSON = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        if (data.notes) {
+          const merged = [...(data.notes as Note[]), ...notes];
+          const unique = merged.filter((n, i, arr) => arr.findIndex((x) => x.id === n.id) === i);
+          setNotes(unique);
+          await chrome.storage.local.set({ notes: unique });
+        }
+        if (data.clips) {
+          await chrome.storage.local.set({ clips: data.clips });
+        }
+        if (data.settings) {
+          const merged = { ...settings, ...data.settings };
+          setSettings(merged);
+          await chrome.storage.local.set({ settings: merged });
+        }
+        setExportStatus("✅ Import successful!");
+        setTimeout(() => setExportStatus(""), 3000);
+      } catch {
+        setExportStatus("❌ Invalid file format");
+        setTimeout(() => setExportStatus(""), 3000);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }, [notes, settings]);
+
+  const handleClearAllData = useCallback(async () => {
+    if (!confirm("⚠️ Are you sure you want to delete ALL ClipNote data? This cannot be undone.")) return;
+    await chrome.storage.local.clear();
+    setNotes([]);
+    setSettings(DEFAULT_SETTINGS);
+    await chrome.storage.local.set({ settings: DEFAULT_SETTINGS });
+    setExportStatus("🗑️ All data cleared");
+    setTimeout(() => setExportStatus(""), 3000);
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", settings.theme);
@@ -228,7 +334,7 @@ export function SidePanelApp() {
           {activeView === "settings" ? (
             <div className="settings-view fade-in">
               <div className="settings-section">
-                <div className="settings-section-title">Appearance</div>
+                <div className="settings-section-title">🎨 Appearance</div>
                 <div className="settings-row">
                   <div>
                     <div className="settings-label">Theme</div>
@@ -239,9 +345,9 @@ export function SidePanelApp() {
                     value={settings.theme}
                     onChange={(e) => handleSettingsChange({ theme: e.target.value as AppSettings["theme"] })}
                   >
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                    <option value="auto">System</option>
+                    <option value="light">☀️ Light</option>
+                    <option value="dark">🌙 Dark</option>
+                    <option value="auto">🔄 System</option>
                   </select>
                 </div>
                 <div className="settings-row">
@@ -254,17 +360,17 @@ export function SidePanelApp() {
                     value={settings.iconColor || "indigo"}
                     onChange={(e) => handleSettingsChange({ iconColor: e.target.value as AppSettings["iconColor"] })}
                   >
-                    <option value="indigo">Indigo (Default)</option>
-                    <option value="blue">Blue (Ocean)</option>
-                    <option value="green">Green (Emerald)</option>
-                    <option value="rose">Rose (Crimson)</option>
-                    <option value="amber">Amber (Sunset)</option>
+                    <option value="indigo">💜 Indigo (Default)</option>
+                    <option value="blue">💙 Blue (Ocean)</option>
+                    <option value="green">💚 Green (Emerald)</option>
+                    <option value="rose">❤️ Rose (Crimson)</option>
+                    <option value="amber">🧡 Amber (Sunset)</option>
                   </select>
                 </div>
                 <div className="settings-row">
                   <div>
-                    <div className="settings-label">Custom Floating Button (FAB) Icon</div>
-                    <div className="settings-description">Upload your own SVG, PNG, or animated GIF for the FAB!</div>
+                    <div className="settings-label">Custom FAB Icon</div>
+                    <div className="settings-description">Upload SVG, PNG, or animated GIF</div>
                   </div>
                   <div className="settings-file-upload-wrapper">
                     {settings.customFabIcon ? (
@@ -274,20 +380,98 @@ export function SidePanelApp() {
                       </div>
                     ) : (
                       <label className="settings-file-upload-label">
-                        Upload Icon/GIF
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="settings-file-input"
-                          onChange={handleFabIconUpload}
-                        />
+                        Upload Icon
+                        <input type="file" accept="image/*" className="settings-file-input" onChange={handleFabIconUpload} />
                       </label>
                     )}
                   </div>
                 </div>
               </div>
+
               <div className="settings-section">
-                <div className="settings-section-title">Behavior</div>
+                <div className="settings-section-title">⚙️ Floating Button (FAB)</div>
+                <div className="settings-row">
+                  <div>
+                    <div className="settings-label">Show Floating Button</div>
+                    <div className="settings-description">Display the FAB on all web pages</div>
+                  </div>
+                  <div
+                    className={`settings-toggle${settings.showFab !== false ? " active" : ""}`}
+                    onClick={() => handleSettingsChange({ showFab: !settings.showFab })}
+                    role="switch"
+                    aria-checked={settings.showFab !== false}
+                  />
+                </div>
+                <div className="settings-row">
+                  <div>
+                    <div className="settings-label">Proximity Awareness</div>
+                    <div className="settings-description">FAB brightens as cursor approaches</div>
+                  </div>
+                  <div
+                    className={`settings-toggle${settings.enableProximityAwareness !== false ? " active" : ""}`}
+                    onClick={() => handleSettingsChange({ enableProximityAwareness: !settings.enableProximityAwareness })}
+                    role="switch"
+                    aria-checked={settings.enableProximityAwareness !== false}
+                  />
+                </div>
+                <div className="settings-row">
+                  <div>
+                    <div className="settings-label">Selection Capture Button</div>
+                    <div className="settings-description">Show "Save to ClipNote" on text selection</div>
+                  </div>
+                  <div
+                    className={`settings-toggle${settings.showSelectionCapture !== false ? " active" : ""}`}
+                    onClick={() => handleSettingsChange({ showSelectionCapture: !settings.showSelectionCapture })}
+                    role="switch"
+                    aria-checked={settings.showSelectionCapture !== false}
+                  />
+                </div>
+                <div className="settings-row">
+                  <div>
+                    <div className="settings-label">Floating Button Size</div>
+                    <div className="settings-description">Adjust FAB size: {settings.fabSize || 48}px</div>
+                  </div>
+                  <input
+                    type="range"
+                    min="32"
+                    max="64"
+                    step="4"
+                    value={settings.fabSize || 48}
+                    onChange={(e) => handleSettingsChange({ fabSize: Number(e.target.value) })}
+                    style={{ width: "100px", cursor: "pointer" }}
+                  />
+                </div>
+                <div className="settings-row">
+                  <div>
+                    <div className="settings-label">Floating Button Opacity</div>
+                    <div className="settings-description">Adjust default idle opacity: {settings.fabOpacity !== undefined ? settings.fabOpacity : 35}%</div>
+                  </div>
+                  <input
+                    type="range"
+                    min="10"
+                    max="100"
+                    step="5"
+                    value={settings.fabOpacity !== undefined ? settings.fabOpacity : 35}
+                    onChange={(e) => handleSettingsChange({ fabOpacity: Number(e.target.value) })}
+                    style={{ width: "100px", cursor: "pointer" }}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-section">
+                <div className="settings-section-title">🔒 Privacy & Security</div>
+                <div className="settings-row">
+                  <div>
+                    <div className="settings-label">Visual Shield (Privacy Mask)</div>
+                    <div className="settings-description">Auto-mask passwords, API keys, and secrets</div>
+                  </div>
+                  <div
+                    className={`settings-toggle${settings.enablePrivacyMask !== false ? " active" : ""}`}
+                    onClick={() => handleSettingsChange({ enablePrivacyMask: !settings.enablePrivacyMask })}
+                    role="switch"
+                    aria-checked={settings.enablePrivacyMask !== false}
+                  />
+                </div>
                 <div className="settings-row">
                   <div>
                     <div className="settings-label">Auto-tag</div>
@@ -302,8 +486,8 @@ export function SidePanelApp() {
                 </div>
                 <div className="settings-row">
                   <div>
-                    <div className="settings-label">Max quick clips</div>
-                    <div className="settings-description">Number of recent clips to keep</div>
+                    <div className="settings-label">Max Quick Clips</div>
+                    <div className="settings-description">Number of recent clips to keep in panel</div>
                   </div>
                   <select
                     className="settings-select"
@@ -311,10 +495,77 @@ export function SidePanelApp() {
                     onChange={(e) => handleSettingsChange({ maxQuickClips: Number(e.target.value) })}
                   >
                     <option value="10">10</option>
-                    <option value="20">20</option>
+                    <option value="20">20 (Default)</option>
                     <option value="50">50</option>
                     <option value="100">100</option>
+                    <option value="200">200</option>
+                    <option value="500">500</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="settings-section">
+                <div className="settings-section-title">📊 Statistics</div>
+                <div className="settings-stats-grid">
+                  <div className="settings-stat-card">
+                    <div className="settings-stat-value">{stats.totalNotes}</div>
+                    <div className="settings-stat-label">Total Notes</div>
+                  </div>
+                  <div className="settings-stat-card">
+                    <div className="settings-stat-value">{stats.totalClips}</div>
+                    <div className="settings-stat-label">Quick Clips</div>
+                  </div>
+                  <div className="settings-stat-card">
+                    <div className="settings-stat-value">{stats.storageUsed}</div>
+                    <div className="settings-stat-label">Storage Used</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="settings-section">
+                <div className="settings-section-title">💾 Data Management</div>
+                {exportStatus && <div className="settings-export-status">{exportStatus}</div>}
+                <div className="settings-btn-group">
+                  <button className="settings-btn settings-btn--primary" onClick={handleExportJSON}>
+                    📦 Export JSON Backup
+                  </button>
+                  <button className="settings-btn settings-btn--primary" onClick={handleExportMarkdown}>
+                    📝 Export as Markdown
+                  </button>
+                  <label className="settings-btn settings-btn--secondary">
+                    📥 Import JSON Backup
+                    <input type="file" accept=".json" style={{ display: "none" }} onChange={handleImportJSON} />
+                  </label>
+                  <button className="settings-btn settings-btn--danger" onClick={handleClearAllData}>
+                    🗑️ Clear All Data
+                  </button>
+                </div>
+              </div>
+
+              <div className="settings-section">
+                <div className="settings-section-title">⌨️ Keyboard Shortcuts</div>
+                <div className="settings-shortcut-list">
+                  <div className="settings-shortcut-row">
+                    <span>Open Side Panel</span>
+                    <kbd>Ctrl+Shift+K</kbd>
+                  </div>
+                  <div className="settings-shortcut-row">
+                    <span>Save Selection (via right-click)</span>
+                    <kbd>Right Click → Save to ClipNote</kbd>
+                  </div>
+                </div>
+              </div>
+
+              <div className="settings-section">
+                <div className="settings-section-title">ℹ️ About</div>
+                <div className="settings-about">
+                  <div className="settings-about-name">ClipNote <span className="settings-about-version">v0.1.0</span></div>
+                  <div className="settings-about-desc">Browser-native clipboard & Markdown notebook</div>
+                  <div className="settings-about-links">
+                    <a href="https://github.com/groele/ClipNote" target="_blank" rel="noopener noreferrer">GitHub</a>
+                    <span>·</span>
+                    <a href="https://github.com/groele/ClipNote/issues" target="_blank" rel="noopener noreferrer">Report Issue</a>
+                  </div>
                 </div>
               </div>
             </div>

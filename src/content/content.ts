@@ -20,7 +20,12 @@ function isExtensionContextValid(): boolean {
 
 function main() {
   // Skip iframes — only run in the top-level window
-  if (window !== window.top) return;
+  try {
+    if (window !== window.top) return;
+  } catch {
+    // Cross-origin iframe — window.top access throws. Skip.
+    return;
+  }
 
   // If we already initialized on this exact window context, return
   if ((window as any)[INIT_FLAG]) return;
@@ -59,10 +64,11 @@ function main() {
    * Safe to call repeatedly — only appends if not already connected.
    */
   function ensureHostsAttached() {
-    if (!document.body) return;
+    const target = document.documentElement || document.body;
+    if (!target) return;
     for (const el of hostElements) {
       if (!el.isConnected) {
-        document.body.appendChild(el);
+        target.appendChild(el);
       }
     }
   }
@@ -100,8 +106,9 @@ function main() {
       }
     });
 
-    if (document.body) {
-      bodyObserver.observe(document.body, { childList: true });
+    const target = document.documentElement || document.body;
+    if (target) {
+      bodyObserver.observe(target, { childList: true });
     }
   }
 

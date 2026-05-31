@@ -37,15 +37,37 @@ export function initFloatingButton(panel: QuickPanelHandle): FloatingButtonHandl
   tooltip.classList.add("clipnote-fab-tooltip");
   tooltip.textContent = "ClipNote - Quick Notes";
 
-  // Set FAB icon dynamically based on settings
-  chrome.storage.local.get("settings").then((data) => {
-    const settings = data.settings;
-    if (settings && settings.customFabIcon) {
-      fab.innerHTML = `<img src="${settings.customFabIcon}" class="clipnote-fab-custom-img" style="width: 24px; height: 24px; border-radius: 50%; object-fit: contain; pointer-events: none;" />`;
+  let currentSettings: any = {};
+
+  function applySettings(settings: any) {
+    if (!settings) return;
+    currentSettings = settings;
+
+    // Show/Hide FAB Host
+    if (settings.showFab === false) {
+      host.style.display = "none";
+    } else {
+      host.style.display = "block";
+    }
+
+    // Custom Icon
+    if (settings.customFabIcon) {
+      fab.innerHTML = `<img src="${settings.customFabIcon}" class="clipnote-fab-custom-img" style="width: 100%; height: 100%; border-radius: 50%; object-fit: contain; pointer-events: none;" />`;
     } else {
       fab.innerHTML = FAB_SVG;
     }
     fab.appendChild(tooltip);
+
+    // Apply CSS variables for Size and Opacity
+    const size = settings.fabSize || 48;
+    const opacity = (settings.fabOpacity !== undefined ? settings.fabOpacity : 35) / 100;
+    root.style.setProperty("--fab-size", `${size}px`);
+    root.style.setProperty("--fab-opacity", opacity.toString());
+  }
+
+  // Set FAB icon dynamically based on settings
+  chrome.storage.local.get("settings").then((data) => {
+    applySettings(data.settings);
   }).catch(() => {
     fab.innerHTML = FAB_SVG;
     fab.appendChild(tooltip);
@@ -54,15 +76,7 @@ export function initFloatingButton(panel: QuickPanelHandle): FloatingButtonHandl
   // Dynamic settings update listener
   const storageListener = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
     if (areaName === "local" && changes.settings) {
-      const newSettings = changes.settings.newValue;
-      if (newSettings) {
-        if (newSettings.customFabIcon) {
-          fab.innerHTML = `<img src="${newSettings.customFabIcon}" class="clipnote-fab-custom-img" style="width: 24px; height: 24px; border-radius: 50%; object-fit: contain; pointer-events: none;" />`;
-        } else {
-          fab.innerHTML = FAB_SVG;
-        }
-        fab.appendChild(tooltip);
-      }
+      applySettings(changes.settings.newValue);
     }
   };
   chrome.storage.onChanged.addListener(storageListener);
@@ -78,6 +92,10 @@ export function initFloatingButton(panel: QuickPanelHandle): FloatingButtonHandl
   // Proximity Proactive Awareness (Within 150px range of FAB center)
   function handleProximity(e: MouseEvent) {
     if (isDragging) return;
+    if (currentSettings.enableProximityAwareness === false) {
+      fab.classList.remove("clipnote-fab--nearby");
+      return;
+    }
     const rect = fab.getBoundingClientRect();
     const fabCenterX = rect.left + rect.width / 2;
     const fabCenterY = rect.top + rect.height / 2;
@@ -143,8 +161,9 @@ export function initFloatingButton(panel: QuickPanelHandle): FloatingButtonHandl
 
     // Bounds checking inside viewport
     const padding = 10;
-    const maxLeft = window.innerWidth - 48 - padding;
-    const maxTop = window.innerHeight - 48 - padding;
+    const size = currentSettings.fabSize || 48;
+    const maxLeft = window.innerWidth - size - padding;
+    const maxTop = window.innerHeight - size - padding;
     newLeft = Math.max(padding, Math.min(newLeft, maxLeft));
     newTop = Math.max(padding, Math.min(newTop, maxTop));
 
