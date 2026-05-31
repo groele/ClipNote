@@ -1,15 +1,16 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { renderMarkdown } from "../shared/markdown";
 import type { Note } from "../shared/types";
 
 interface MarkdownEditorProps {
   note: Note;
+  notebooks: string[];
   onChange: (note: Note) => void;
 }
 
 type ViewMode = "edit" | "preview" | "split";
 
-export function MarkdownEditor({ note, onChange }: MarkdownEditorProps) {
+export function MarkdownEditor({ note, notebooks, onChange }: MarkdownEditorProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("split");
   const [tagInput, setTagInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -41,6 +42,20 @@ export function MarkdownEditor({ note, onChange }: MarkdownEditorProps) {
     };
   }, []);
 
+  const wordCount = useMemo(() => {
+    const text = note.markdown.trim();
+    if (!text) return 0;
+    return text.split(/\s+/).length;
+  }, [note.markdown]);
+
+  const charCount = useMemo(() => {
+    return note.markdown.length;
+  }, [note.markdown]);
+
+  const readingTime = useMemo(() => {
+    return Math.max(1, Math.round(wordCount / 200));
+  }, [wordCount]);
+
   const insertMarkdown = useCallback(
     (before: string, after: string = "") => {
       const textarea = textareaRef.current;
@@ -63,6 +78,33 @@ export function MarkdownEditor({ note, onChange }: MarkdownEditorProps) {
       });
     },
     [note.markdown, updateNote]
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // Bold (Ctrl+B)
+      if (e.key === "b" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        insertMarkdown("**", "**");
+      }
+      // Italic (Ctrl+I)
+      else if (e.key === "i" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        insertMarkdown("*", "*");
+      }
+      // Link (Ctrl+K)
+      else if (e.key === "k" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        insertMarkdown("[", "](url)");
+      }
+      // Date-Time (Ctrl+Shift+D)
+      else if (e.key === "D" && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+        e.preventDefault();
+        const dateStr = `\n\n*Created on ${new Date().toLocaleString()}*\n\n`;
+        insertMarkdown(dateStr);
+      }
+    },
+    [insertMarkdown]
   );
 
   const handleTagKeyDown = useCallback(
@@ -115,6 +157,18 @@ export function MarkdownEditor({ note, onChange }: MarkdownEditorProps) {
           onChange={(e) => updateNote({ title: e.target.value })}
         />
         <div className="editor-meta">
+          <select
+            className="editor-notebook-select"
+            value={note.projectId || "Inbox"}
+            onChange={(e) => updateNote({ projectId: e.target.value })}
+            title="Notebook Workspace"
+          >
+            {notebooks.map((nb) => (
+              <option key={nb} value={nb}>
+                📓 {nb}
+              </option>
+            ))}
+          </select>
           <button className="editor-status-btn" onClick={cycleStatus} title="Toggle status">
             {note.status === "favorite" ? "★" : note.status === "archived" ? "↓" : "○"}{" "}
             {note.status}
@@ -221,6 +275,7 @@ export function MarkdownEditor({ note, onChange }: MarkdownEditorProps) {
               className="editor-textarea"
               value={note.markdown}
               onChange={(e) => updateNote({ markdown: e.target.value, plainText: e.target.value })}
+              onKeyDown={handleKeyDown}
               placeholder="Write your note in Markdown..."
               spellCheck
             />
@@ -232,6 +287,11 @@ export function MarkdownEditor({ note, onChange }: MarkdownEditorProps) {
             dangerouslySetInnerHTML={{ __html: renderMarkdown(note.markdown) }}
           />
         )}
+      </div>
+      <div className="editor-footer-status">
+        <span>📝 {wordCount} words</span>
+        <span>🔤 {charCount} characters</span>
+        <span>⏱️ {readingTime} min read</span>
       </div>
     </div>
   );

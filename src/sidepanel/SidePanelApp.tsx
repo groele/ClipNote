@@ -28,22 +28,26 @@ export function SidePanelApp() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [stats, setStats] = useState({ totalNotes: 0, totalClips: 0, storageUsed: "0 KB" });
   const [exportStatus, setExportStatus] = useState("");
+  const [notebooks, setNotebooks] = useState<string[]>(["Inbox", "Work", "Study", "Personal"]);
+  const [selectedNotebook, setSelectedNotebook] = useState<string>("All");
+  const [clips, setClips] = useState<any[]>([]);
+  const [newNotebookName, setNewNotebookName] = useState("");
 
   useEffect(() => {
     async function loadStats() {
       try {
         const data = await chrome.storage.local.get(["clips", "notes"]);
-        const clips = data.clips ?? [];
+        const clipsList = data.clips ?? [];
         const notesList = data.notes ?? [];
         const storageBytes = JSON.stringify(data).length;
         const storageStr = storageBytes < 1024 ? `${storageBytes} B`
           : storageBytes < 1024 * 1024 ? `${(storageBytes / 1024).toFixed(1)} KB`
           : `${(storageBytes / (1024 * 1024)).toFixed(1)} MB`;
-        setStats({ totalNotes: notesList.length, totalClips: clips.length, storageUsed: storageStr });
+        setStats({ totalNotes: notesList.length, totalClips: clipsList.length, storageUsed: storageStr });
       } catch {}
     }
     loadStats();
-  }, [notes]);
+  }, [notes, clips]);
 
   const handleExportJSON = useCallback(async () => {
     try {
@@ -127,6 +131,34 @@ export function SidePanelApp() {
     setTimeout(() => setExportStatus(""), 3000);
   }, []);
 
+  const handleAddNotebook = useCallback((name: string) => {
+    const trimmed = name.trim();
+    if (trimmed && !notebooks.includes(trimmed)) {
+      const next = [...notebooks, trimmed];
+      setNotebooks(next);
+      chrome.storage.local.set({ notebooks: next });
+    }
+  }, [notebooks]);
+
+  const handleDeleteNotebook = useCallback((name: string) => {
+    if (name === "Inbox") return;
+    if (confirm(`⚠️ Are you sure you want to delete the notebook "${name}"? Notes inside will be moved to Inbox.`)) {
+      const nextNotebooks = notebooks.filter((n) => n !== name);
+      setNotebooks(nextNotebooks);
+      chrome.storage.local.set({ notebooks: nextNotebooks });
+      
+      const nextNotes = notes.map((note) =>
+        note.projectId === name ? { ...note, projectId: "Inbox", updatedAt: Date.now() } : note
+      );
+      setNotes(nextNotes);
+      chrome.storage.local.set({ notes: nextNotes });
+      
+      if (selectedNotebook === name) {
+        setSelectedNotebook("All");
+      }
+    }
+  }, [notebooks, notes, selectedNotebook]);
+
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", settings.theme);
   }, [settings.theme]);
@@ -143,17 +175,20 @@ export function SidePanelApp() {
   }, [settings.iconColor]);
 
   useEffect(() => {
-    chrome.storage.local.get(["notes", "settings"]).then((data) => {
+    chrome.storage.local.get(["notes", "settings", "notebooks", "clips"]).then((data) => {
       if (data.notes) setNotes(data.notes);
       if (data.settings) setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
+      if (data.notebooks) setNotebooks(data.notebooks);
+      if (data.clips) setClips(data.clips || []);
     });
   }, []);
 
   useEffect(() => {
     function handleMessage(msg: any) {
       if (msg.type === "CLIP_SAVED" || msg.type === "SAVE_CLIP") {
-        chrome.storage.local.get("notes").then((data) => {
+        chrome.storage.local.get(["notes", "clips"]).then((data) => {
           if (data.notes) setNotes(data.notes);
+          if (data.clips) setClips(data.clips || []);
         });
       }
     }
@@ -162,15 +197,19 @@ export function SidePanelApp() {
   }, []);
 
   const filteredNotes = useMemo(() => {
-    if (!searchQuery.trim()) return notes;
+    let list = notes;
+    if (selectedNotebook !== "All") {
+      list = list.filter((n) => (n.projectId || "Inbox") === selectedNotebook);
+    }
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase();
-    return notes.filter(
+    return list.filter(
       (n) =>
         n.title.toLowerCase().includes(q) ||
         n.plainText.toLowerCase().includes(q) ||
         n.tags.some((t) => t.toLowerCase().includes(q))
     );
-  }, [notes, searchQuery]);
+  }, [notes, searchQuery, selectedNotebook]);
 
   const handleSelectNote = useCallback((note: Note) => {
     setSelectedNote(note);
@@ -261,6 +300,7 @@ export function SidePanelApp() {
       plainText: "",
       tags: [],
       status: "inbox",
+      projectId: selectedNotebook !== "All" ? selectedNotebook : "Inbox",
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -269,7 +309,65 @@ export function SidePanelApp() {
     chrome.storage.local.set({ notes: next });
     setSelectedNote(note);
     setActiveView("editor");
-  }, [notes]);
+  }, [notes, selectedNotebook]);
+
+  const heatmapData = useMemo(() => {
+    const dates: { [key: string]: number } = {};
+    
+    notes.forEach((note) => {
+      const d = new Date(note.createdAt).toLocaleDateString();
+      dates[d] = (dates[d] || 0) + 1;
+    });
+    
+    clips.forEach((clip) => {
+      const ts = clip.capturedAt || (clip as any).timestamp || Date.now();
+      const d = new Date(ts).toLocaleDateString();
+      dates[d] = (dates[d] || 0) + 1;
+    });
+
+    const result = [];
+    const startDay = new Date();
+    startDay.setDate(startDay.getDate() - 41);
+    
+    const dayOfWeek = startDay.getDay();
+    startDay.setDate(startDay.getDate() - dayOfWeek);
+
+    for (let i = 0; i < 42; i++) {
+      const current = new Date(startDay);
+      current.setDate(startDay.getDate() + i);
+      const key = current.toLocaleDateString();
+      const count = dates[key] || 0;
+      result.push({
+        date: current,
+        count,
+        level: count === 0 ? 0 : count <= 2 ? 1 : count <= 4 ? 2 : 3,
+      });
+    }
+    return result;
+  }, [notes, clips]);
+
+  const topSources = useMemo(() => {
+    const counts: { [key: string]: number } = {};
+    clips.forEach((clip) => {
+      if (clip.sourceUrl) {
+        try {
+          const domain = new URL(clip.sourceUrl).hostname.replace(/^www\./, "");
+          counts[domain] = (counts[domain] || 0) + 1;
+        } catch {}
+      }
+    });
+    
+    const sorted = Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4);
+      
+    const total = clips.filter((c) => c.sourceUrl).length || 1;
+    return sorted.map(([domain, count]) => ({
+      domain,
+      count,
+      percentage: Math.round((count / total) * 100),
+    }));
+  }, [clips]);
 
   return (
     <>
@@ -319,6 +417,20 @@ export function SidePanelApp() {
         <aside className={`sidebar${sidebarCollapsed ? " collapsed" : ""}`}>
           <div className="sidebar-header">
             <SearchBar value={searchQuery} onChange={setSearchQuery} />
+            <div className="sidebar-notebook-select-wrapper">
+              <select
+                className="sidebar-notebook-select"
+                value={selectedNotebook}
+                onChange={(e) => setSelectedNotebook(e.target.value)}
+              >
+                <option value="All">📂 All Notebooks</option>
+                {notebooks.map((nb) => (
+                  <option key={nb} value={nb}>
+                    {nb === "Inbox" ? "📥" : "📓"} {nb}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <NoteList
             notes={filteredNotes}
@@ -385,6 +497,60 @@ export function SidePanelApp() {
                       </label>
                     )}
                   </div>
+                </div>
+              </div>
+
+              <div className="settings-section">
+                <div className="settings-section-title">📂 Workspaces & Notebooks</div>
+                <div className="settings-row" style={{ borderBottom: "none", paddingBottom: 0 }}>
+                  <div>
+                    <div className="settings-label">Create Custom Notebook</div>
+                    <div className="settings-description">Add a new workspace folder for notes</div>
+                  </div>
+                </div>
+                <div className="settings-notebook-create-bar">
+                  <input
+                    type="text"
+                    className="settings-notebook-input"
+                    placeholder="Notebook name..."
+                    value={newNotebookName}
+                    onChange={(e) => setNewNotebookName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleAddNotebook(newNotebookName);
+                        setNewNotebookName("");
+                      }
+                    }}
+                  />
+                  <button
+                    className="settings-btn settings-btn--primary"
+                    style={{ padding: "8px 16px" }}
+                    onClick={() => {
+                      handleAddNotebook(newNotebookName);
+                      setNewNotebookName("");
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+                <div className="settings-notebooks-list">
+                  {notebooks.map((nb) => (
+                    <div key={nb} className="settings-notebook-item">
+                      <div className="settings-notebook-item-left">
+                        <span>{nb === "Inbox" ? "📥" : "📓"}</span>
+                        <span className="settings-notebook-item-name">{nb}</span>
+                      </div>
+                      {nb !== "Inbox" && (
+                        <button
+                          className="settings-notebook-delete-btn"
+                          onClick={() => handleDeleteNotebook(nb)}
+                          title="Delete notebook"
+                        >
+                          &times;
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -505,7 +671,7 @@ export function SidePanelApp() {
               </div>
 
               <div className="settings-section">
-                <div className="settings-section-title">📊 Statistics</div>
+                <div className="settings-section-title">📊 Statistics & Analytics</div>
                 <div className="settings-stats-grid">
                   <div className="settings-stat-card">
                     <div className="settings-stat-value">{stats.totalNotes}</div>
@@ -520,6 +686,46 @@ export function SidePanelApp() {
                     <div className="settings-stat-label">Storage Used</div>
                   </div>
                 </div>
+
+                <div className="settings-sub-section-title">📅 Clipping Activity (Past 6 Weeks)</div>
+                <div className="settings-heatmap-container">
+                  <div className="settings-heatmap-grid">
+                    {heatmapData.map((day, idx) => (
+                      <div
+                        key={idx}
+                        className={`settings-heatmap-cell level-${day.level}`}
+                        title={`${day.date.toLocaleDateString()}: ${day.count} entries`}
+                      />
+                    ))}
+                  </div>
+                  <div className="settings-heatmap-legend">
+                    <span>Less</span>
+                    <div className="settings-heatmap-cell level-0" />
+                    <div className="settings-heatmap-cell level-1" />
+                    <div className="settings-heatmap-cell level-2" />
+                    <div className="settings-heatmap-cell level-3" />
+                    <span>More</span>
+                  </div>
+                </div>
+
+                {topSources.length > 0 && (
+                  <>
+                    <div className="settings-sub-section-title">🌐 Top Clipping Sources</div>
+                    <div className="settings-sources-list">
+                      {topSources.map((src, idx) => (
+                        <div key={idx} className="settings-source-row">
+                          <div className="settings-source-info">
+                            <span className="settings-source-domain">{src.domain}</span>
+                            <span className="settings-source-count">{src.count} clips ({src.percentage}%)</span>
+                          </div>
+                          <div className="settings-source-bar-bg">
+                            <div className="settings-source-bar-fill" style={{ width: `${src.percentage}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="settings-section">
@@ -570,7 +776,12 @@ export function SidePanelApp() {
               </div>
             </div>
           ) : selectedNote ? (
-            <MarkdownEditor key={selectedNote.id} note={selectedNote} onChange={handleNoteChange} />
+            <MarkdownEditor
+              key={selectedNote.id}
+              note={selectedNote}
+              notebooks={notebooks}
+              onChange={handleNoteChange}
+            />
           ) : (
             <div className="empty-content fade-in">
               <div className="empty-content-icon">

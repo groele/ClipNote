@@ -1155,3 +1155,281 @@ a:hover {
 [data-theme="dark"] .settings-about-links a {
   color: #818cf8;
 }
+
+/* ─── Sidebar Notebook Select styles ─── */
+.sidebar-notebook-select-wrapper {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.sidebar-notebook-select {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sidebar-notebook-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-bg);
+}
+
+/* ─── Editor Notebook Dropdown styles ─── */
+.editor-notebook-select {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  transition: border-color 0.15s ease;
+}
+
+.editor-notebook-select:focus {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* ─── Editor Word Counts Footer Bar ─── */
+.editor-footer-status {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+/* ─── Settings Custom Notebooks Management ─── */
+.settings-notebook-create-bar {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.settings-notebook-input {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.settings-notebook-input:focus {
+  border-color: #6366f1;
+}
+
+.settings-notebooks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.settings-notebook-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  font-size: 13px;
+  color: #334155;
+  transition: background 0.15s ease;
+}
+
+.settings-notebook-item:hover {
+  background: #f1f5f9;
+}
+
+.settings-notebook-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-notebook-item-name {
+  font-weight: 500;
+}
+
+.settings-notebook-delete-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px;
+  border-radius: 4px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.settings-notebook-delete-btn:hover {
+  color: #dc2626;
+  background: #fee2e2;
+}
+
+/* ─── Settings Heatmap calendar Analytics ─── */
+.settings-sub-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin: 18px 0 8px;
+  letter-spacing: 0.03em;
+}
+
+.settings-heatmap-container {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.settings-heatmap-grid {
+  display: grid;
+  grid-template-rows: repeat(7, 10px);
+  grid-auto-flow: column;
+  gap: 3px;
+  justify-content: start;
+}
+
+.settings-heatmap-cell {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.settings-heatmap-cell:hover {
+  transform: scale(1.3);
+  z-index: 2;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.15);
+}
+
+.settings-heatmap-cell.level-0 { background-color: #ebedf0; }
+.settings-heatmap-cell.level-1 { background-color: #c6e48b; }
+.settings-heatmap-cell.level-2 { background-color: #7bc96f; }
+.settings-heatmap-cell.level-3 { background-color: #239a3b; }
+
+.settings-heatmap-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+/* ─── Top Domain Clips Sources Horizontal Progress Bars ─── */
+.settings-sources-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.settings-source-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-source-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.settings-source-domain {
+  font-weight: 600;
+  color: #334155;
+}
+
+.settings-source-count {
+  color: #64748b;
+}
+
+.settings-source-bar-bg {
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.settings-source-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #3b82f6);
+  border-radius: 3px;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Dark mode overrides for Workspaces, Heatmap and Analytics */
+[data-theme="dark"] .settings-notebook-item {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .settings-notebook-item:hover {
+  background: #334155;
+}
+
+[data-theme="dark"] .settings-notebook-delete-btn:hover {
+  background: #450a0a;
+  color: #f87171;
+}
+
+[data-theme="dark"] .settings-heatmap-container,
+[data-theme="dark"] .settings-sources-list {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .settings-heatmap-cell.level-0 { background-color: #161b22; }
+[data-theme="dark"] .settings-heatmap-cell.level-1 { background-color: #0e4429; }
+[data-theme="dark"] .settings-heatmap-cell.level-2 { background-color: #006d32; }
+[data-theme="dark"] .settings-heatmap-cell.level-3 { background-color: #26a641; }
+
+[data-theme="dark"] .settings-source-domain {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .settings-source-count {
+  color: #64748b;
+}
+
+[data-theme="dark"] .settings-source-bar-bg {
+  background: #334155;
+}
