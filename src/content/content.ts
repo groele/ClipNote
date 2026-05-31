@@ -1,6 +1,7 @@
 import { initFloatingButton, type FloatingButtonHandle } from "./floating-button";
 import { initQuickPanel, type QuickPanelHandle } from "./quick-panel";
 import { initSelectionCapture } from "./selection-capture";
+import { getDeepSelectionText } from "../shared/selection";
 
 const INIT_FLAG = "__clipnote_initialized__";
 
@@ -153,13 +154,17 @@ function main() {
 
   // Listen for messages from the service worker
   try {
-    chrome.runtime.onMessage.addListener((message) => {
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (!isExtensionContextValid()) return;
       if (message.type === "OPEN_PANEL") {
         panel.open();
       }
       if (message.type === "CLIP_SAVED") {
         panel.refresh();
+      }
+      if (message.type === "GET_SELECTED_TEXT") {
+        const text = getDeepSelectionText();
+        sendResponse({ text });
       }
     });
   } catch {

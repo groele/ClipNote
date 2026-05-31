@@ -153,10 +153,26 @@ async function saveClipAndNote(payload: { text: string; url?: string; title?: st
 }
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (info.menuItemId !== CONTEXT_MENU_ID || !info.selectionText) return;
+  if (info.menuItemId !== CONTEXT_MENU_ID) return;
+
+  let text = info.selectionText || "";
+
+  if (tab?.id) {
+    try {
+      // Query content script for high-fidelity selected text (with newlines/paragraphs)
+      const response = (await chrome.tabs.sendMessage(tab.id, { type: MessageType.GET_SELECTED_TEXT })) as { text: string };
+      if (response && response.text) {
+        text = response.text;
+      }
+    } catch {
+      // Fallback to collapsed browser selectionText if injection is blocked or fails
+    }
+  }
+
+  if (!text.trim()) return;
 
   await saveClipAndNote({
-    text: info.selectionText,
+    text: text,
     url: tab?.url,
     title: tab?.title,
     timestamp: Date.now(),

@@ -1,4 +1,5 @@
 import { MessageType, sendMessage } from "../shared/message-bus";
+import { getDeepSelection } from "../shared/selection";
 import contentStyles from "./content.css?inline";
 
 interface SelectionCaptureHandle {
@@ -23,81 +24,6 @@ function showToast(message: string, root: HTMLElement) {
     toast.classList.remove("clipnote-toast--visible");
     setTimeout(() => toast.remove(), 300);
   }, 2000);
-}
-
-interface DeepSelection {
-  text: string;
-  rect: DOMRect | null;
-}
-
-function getDeepSelection(e: MouseEvent): DeepSelection {
-  // 1. Try standard Selection in light DOM first
-  const sel = window.getSelection();
-  if (sel && sel.toString().trim()) {
-    try {
-      const range = sel.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        return { text: sel.toString().trim(), rect };
-      }
-    } catch {}
-  }
-
-  // 2. Penetrate Shadow DOMs recursively
-  let activeEl = document.activeElement;
-  while (activeEl && activeEl.shadowRoot) {
-    const shadowRoot = activeEl.shadowRoot;
-    
-    // Try shadowRoot selection if supported
-    const shadowSel = (shadowRoot as any).getSelection ? (shadowRoot as any).getSelection() : null;
-    if (shadowSel && shadowSel.toString().trim()) {
-      try {
-        const range = shadowSel.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-          return { text: shadowSel.toString().trim(), rect };
-        }
-      } catch {}
-    }
-
-    // Check if deep element is input/textarea inside shadow root
-    const deepActiveEl = shadowRoot.activeElement;
-    if (
-      deepActiveEl instanceof HTMLInputElement ||
-      deepActiveEl instanceof HTMLTextAreaElement
-    ) {
-      const text = deepActiveEl.value.substring(
-        deepActiveEl.selectionStart || 0,
-        deepActiveEl.selectionEnd || 0
-      ).trim();
-      
-      if (text) {
-        const mouseRect = new DOMRect(e.clientX - 50, e.clientY - 20, 100, 20);
-        return { text, rect: mouseRect };
-      }
-    }
-    
-    if (deepActiveEl === activeEl) break;
-    activeEl = deepActiveEl;
-  }
-
-  // 3. Fallback for standard light DOM input/textarea
-  const activeElLight = document.activeElement;
-  if (
-    activeElLight instanceof HTMLInputElement ||
-    activeElLight instanceof HTMLTextAreaElement
-  ) {
-    const text = activeElLight.value.substring(
-      activeElLight.selectionStart || 0,
-      activeElLight.selectionEnd || 0
-    ).trim();
-    if (text) {
-      const mouseRect = new DOMRect(e.clientX - 50, e.clientY - 20, 100, 20);
-      return { text, rect: mouseRect };
-    }
-  }
-
-  return { text: "", rect: null };
 }
 
 export function initSelectionCapture(): SelectionCaptureHandle {

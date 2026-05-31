@@ -3,7 +3,8 @@ export enum MessageType {
   CLIP_SAVED = "CLIP_SAVED",
   OPEN_SIDEBAR = "OPEN_SIDEBAR",
   REQUEST_NOTES = "REQUEST_NOTES",
-  SYNC_COMPLETE = "SYNC_COMPLETE"
+  SYNC_COMPLETE = "SYNC_COMPLETE",
+  GET_SELECTED_TEXT = "GET_SELECTED_TEXT"
 }
 
 export interface Message<T = unknown> {
