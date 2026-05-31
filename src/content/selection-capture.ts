@@ -25,6 +25,81 @@ function showToast(message: string, root: HTMLElement) {
   }, 2000);
 }
 
+interface DeepSelection {
+  text: string;
+  rect: DOMRect | null;
+}
+
+function getDeepSelection(e: MouseEvent): DeepSelection {
+  // 1. Try standard Selection in light DOM first
+  const sel = window.getSelection();
+  if (sel && sel.toString().trim()) {
+    try {
+      const range = sel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        return { text: sel.toString().trim(), rect };
+      }
+    } catch {}
+  }
+
+  // 2. Penetrate Shadow DOMs recursively
+  let activeEl = document.activeElement;
+  while (activeEl && activeEl.shadowRoot) {
+    const shadowRoot = activeEl.shadowRoot;
+    
+    // Try shadowRoot selection if supported
+    const shadowSel = (shadowRoot as any).getSelection ? (shadowRoot as any).getSelection() : null;
+    if (shadowSel && shadowSel.toString().trim()) {
+      try {
+        const range = shadowSel.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          return { text: shadowSel.toString().trim(), rect };
+        }
+      } catch {}
+    }
+
+    // Check if deep element is input/textarea inside shadow root
+    const deepActiveEl = shadowRoot.activeElement;
+    if (
+      deepActiveEl instanceof HTMLInputElement ||
+      deepActiveEl instanceof HTMLTextAreaElement
+    ) {
+      const text = deepActiveEl.value.substring(
+        deepActiveEl.selectionStart || 0,
+        deepActiveEl.selectionEnd || 0
+      ).trim();
+      
+      if (text) {
+        const mouseRect = new DOMRect(e.clientX - 50, e.clientY - 20, 100, 20);
+        return { text, rect: mouseRect };
+      }
+    }
+    
+    if (deepActiveEl === activeEl) break;
+    activeEl = deepActiveEl;
+  }
+
+  // 3. Fallback for standard light DOM input/textarea
+  const activeElLight = document.activeElement;
+  if (
+    activeElLight instanceof HTMLInputElement ||
+    activeElLight instanceof HTMLTextAreaElement
+  ) {
+    const text = activeElLight.value.substring(
+      activeElLight.selectionStart || 0,
+      activeElLight.selectionEnd || 0
+    ).trim();
+    if (text) {
+      const mouseRect = new DOMRect(e.clientX - 50, e.clientY - 20, 100, 20);
+      return { text, rect: mouseRect };
+    }
+  }
+
+  return { text: "", rect: null };
+}
+
 export function initSelectionCapture(): SelectionCaptureHandle {
   const host = document.createElement("clipnote-selection-host");
   host.classList.add("clipnote-selection-host");
@@ -47,6 +122,7 @@ export function initSelectionCapture(): SelectionCaptureHandle {
   shadow.appendChild(root);
 
   let currentSettings: any = {};
+  let lastCapturedText = "";
 
   chrome.storage.local.get("settings").then((data) => {
     if (data.settings) {
@@ -75,7 +151,8 @@ export function initSelectionCapture(): SelectionCaptureHandle {
     saveBtn.style.top = `${top}px`;
   }
 
-  function showButton(x: number, y: number) {
+  function showButton(x: number, y: number, text: string) {
+    lastCapturedText = text;
     if (hideTimeout) {
       clearTimeout(hideTimeout);
       hideTimeout = null;
@@ -86,6 +163,7 @@ export function initSelectionCapture(): SelectionCaptureHandle {
 
   function hideButton() {
     saveBtn.classList.remove("clipnote-selection-btn--visible");
+    lastCapturedText = "";
   }
 
   function handleMouseUp(e: MouseEvent) {
@@ -98,19 +176,20 @@ export function initSelectionCapture(): SelectionCaptureHandle {
       return;
     }
 
-    const selection = window.getSelection();
-    const text = selection?.toString().trim();
+    // Let mouseup finish so selection state is fully populated inside DOM
+    setTimeout(() => {
+      const { text, rect } = getDeepSelection(e);
 
-    if (text && text.length > 0) {
-      const range = selection!.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      showButton(
-        rect.left + rect.width / 2 - saveBtn.offsetWidth / 2,
-        rect.top
-      );
-    } else {
-      hideButton();
-    }
+      if (text && rect) {
+        showButton(
+          rect.left + rect.width / 2 - saveBtn.offsetWidth / 2,
+          rect.top,
+          text
+        );
+      } else {
+        hideButton();
+      }
+    }, 0);
   }
 
   function handleMouseDown(e: MouseEvent) {
@@ -120,8 +199,7 @@ export function initSelectionCapture(): SelectionCaptureHandle {
   }
 
   async function handleSaveClick() {
-    const selection = window.getSelection();
-    const text = selection?.toString().trim();
+    const text = lastCapturedText.trim();
     if (!text) return;
 
     try {
@@ -135,7 +213,19 @@ export function initSelectionCapture(): SelectionCaptureHandle {
       // Service worker may be inactive
     }
 
+    // Clear ranges in light DOM
     window.getSelection()?.removeAllRanges();
+
+    // Clear ranges inside active shadow root
+    let activeEl = document.activeElement;
+    while (activeEl && activeEl.shadowRoot) {
+      const shadowSel = (activeEl.shadowRoot as any).getSelection ? (activeEl.shadowRoot as any).getSelection() : null;
+      if (shadowSel) {
+        shadowSel.removeAllRanges();
+      }
+      activeEl = activeEl.shadowRoot.activeElement;
+    }
+
     hideButton();
     showToast("Saved!", root);
   }

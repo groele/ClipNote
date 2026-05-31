@@ -64,7 +64,7 @@ function main() {
    * Safe to call repeatedly — only appends if not already connected.
    */
   function ensureHostsAttached() {
-    const target = document.documentElement || document.body;
+    const target = document.body;
     if (!target) return;
     for (const el of hostElements) {
       if (!el.isConnected) {
@@ -106,7 +106,7 @@ function main() {
       }
     });
 
-    const target = document.documentElement || document.body;
+    const target = document.body;
     if (target) {
       bodyObserver.observe(target, { childList: true });
     }
