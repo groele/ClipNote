@@ -70,7 +70,6 @@ export function initFloatingButton(panel: QuickPanelHandle): FloatingButtonHandl
   root.appendChild(fab);
   shadow.appendChild(styleEl);
   shadow.appendChild(root);
-  document.body.appendChild(host);
 
   setTimeout(() => {
     fab.classList.remove("clipnote-fab--pulse");
@@ -161,10 +160,14 @@ export function initFloatingButton(panel: QuickPanelHandle): FloatingButtonHandl
 
     if (hasMoved) {
       const rect = fab.getBoundingClientRect();
-      await chrome.storage.local.set({
-        fabPosition: { left: rect.left, top: rect.top },
-        panelPosition: null // Clear panelPosition to snap back to the new FAB position!
-      });
+      try {
+        await chrome.storage.local.set({
+          fabPosition: { left: rect.left, top: rect.top },
+          panelPosition: null
+        });
+      } catch {
+        // Extension context may be invalidated — position won't persist but FAB stays functional
+      }
     } else {
       // Direct click! Toggle quick panel next to FAB rect
       panel.toggle(fab.getBoundingClientRect());

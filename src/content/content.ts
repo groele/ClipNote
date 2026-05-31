@@ -4,10 +4,33 @@ import { initSelectionCapture } from "./selection-capture";
 
 const INIT_FLAG = "__clipnote_initialized__";
 
+/**
+ * Safely check if the Chrome extension context is still valid.
+ * After an extension reload/update, all chrome.* APIs throw
+ * "Extension context invalidated". We must detect this and bail
+ * gracefully instead of leaving broken observers running.
+ */
+function isExtensionContextValid(): boolean {
+  try {
+    return !!chrome.runtime?.id;
+  } catch {
+    return false;
+  }
+}
+
 function main() {
+  // Skip iframes — only run in the top-level window
+  if (window !== window.top) return;
+
   // If we already initialized on this exact window context, return
   if ((window as any)[INIT_FLAG]) return;
   (window as any)[INIT_FLAG] = true;
+
+  // Verify extension context is alive before proceeding
+  if (!isExtensionContextValid()) {
+    delete (window as any)[INIT_FLAG];
+    return;
+  }
 
   // Clean up any stale elements from previous installations/injections
   const staleElements = document.querySelectorAll(
@@ -17,7 +40,7 @@ function main() {
     try {
       el.remove();
     } catch (e) {
-      console.warn("Failed to remove stale element:", e);
+      console.warn("ClipNote: Failed to remove stale element:", e);
     }
   });
 
@@ -25,28 +48,56 @@ function main() {
   const fab: FloatingButtonHandle = initFloatingButton(panel);
   const selection = initSelectionCapture();
 
+  // Collect host elements for easy iteration
+  const hostElements = [panel.element, fab.element, selection.element];
+
   let currentBody = document.body;
   let bodyObserver: MutationObserver | null = null;
 
+  /**
+   * Ensure all three host elements are attached to the current document.body.
+   * Safe to call repeatedly — only appends if not already connected.
+   */
+  function ensureHostsAttached() {
+    if (!document.body) return;
+    for (const el of hostElements) {
+      if (!el.isConnected) {
+        document.body.appendChild(el);
+      }
+    }
+  }
+
+  /**
+   * Set up a MutationObserver on the active document.body.
+   * If any of our host elements get removed (e.g. React hydration,
+   * SPA client-side route cleanup), re-append them immediately.
+   */
   function setupBodyObserver() {
     if (bodyObserver) {
       bodyObserver.disconnect();
     }
 
     bodyObserver = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.removedNodes.forEach((node) => {
-          if (node === panel.element && !panel.element.isConnected) {
-            document.body?.appendChild(panel.element);
+      // Check extension context on each mutation batch
+      if (!isExtensionContextValid()) {
+        cleanup();
+        return;
+      }
+
+      let needsReattach = false;
+      for (const mutation of mutations) {
+        for (const node of mutation.removedNodes) {
+          if (hostElements.includes(node as HTMLElement)) {
+            needsReattach = true;
+            break;
           }
-          if (node === fab.element && !fab.element.isConnected) {
-            document.body?.appendChild(fab.element);
-          }
-          if (node === selection.element && !selection.element.isConnected) {
-            document.body?.appendChild(selection.element);
-          }
-        });
-      });
+        }
+        if (needsReattach) break;
+      }
+
+      if (needsReattach) {
+        ensureHostsAttached();
+      }
     });
 
     if (document.body) {
@@ -54,59 +105,76 @@ function main() {
     }
   }
 
-  // Inject host elements and setup initial body observer if body is ready
-  if (document.body) {
-    if (!panel.element.isConnected) document.body.appendChild(panel.element);
-    if (!fab.element.isConnected) document.body.appendChild(fab.element);
-    if (!selection.element.isConnected) document.body.appendChild(selection.element);
-    setupBodyObserver();
-  }
+  // Initial attachment
+  ensureHostsAttached();
+  setupBodyObserver();
 
-  // Parent observer to handle SPA whole-body swaps (like Turbo/pjax on GitHub, YouTube, etc.)
-  // and handle late body creation if body is initially missing
+  /**
+   * Parent-level observer on <html> to detect whole-body swaps.
+   * SPAs like GitHub (Turbo/pjax) and YouTube replace the entire
+   * <body> element during navigation. This observer detects that,
+   * migrates the bodyObserver to the new body, and re-injects hosts.
+   *
+   * Observing documentElement with { childList: true } only (no subtree)
+   * fires exclusively when <head> or <body> are added/removed — zero CPU cost.
+   */
   const htmlObserver = new MutationObserver((mutations) => {
-    let bodySwappedOrAdded = false;
-    mutations.forEach((mutation) => {
-      mutation.addedNodes.forEach((node) => {
+    if (!isExtensionContextValid()) {
+      cleanup();
+      return;
+    }
+
+    let bodyChanged = false;
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
         if (node.nodeName === "BODY") {
-          bodySwappedOrAdded = true;
+          bodyChanged = true;
+          break;
         }
-      });
-    });
+      }
+      if (bodyChanged) break;
+    }
 
-    if (bodySwappedOrAdded && document.body && document.body !== currentBody) {
+    if (bodyChanged && document.body && document.body !== currentBody) {
       currentBody = document.body;
-
-      // Re-append hosts to the new/added body
-      if (!panel.element.isConnected) document.body.appendChild(panel.element);
-      if (!fab.element.isConnected) document.body.appendChild(fab.element);
-      if (!selection.element.isConnected) document.body.appendChild(selection.element);
-
+      ensureHostsAttached();
       setupBodyObserver();
     }
   });
 
   htmlObserver.observe(document.documentElement, { childList: true });
 
-  chrome.runtime.onMessage.addListener((message) => {
-    if (message.type === "OPEN_PANEL") {
-      panel.open();
-    }
-    if (message.type === "CLIP_SAVED") {
-      panel.refresh();
-    }
-  });
-
-  chrome.runtime.onConnect.addListener((port) => {
-    port.onDisconnect.addListener(() => {
-      cleanup();
+  // Listen for messages from the service worker
+  try {
+    chrome.runtime.onMessage.addListener((message) => {
+      if (!isExtensionContextValid()) return;
+      if (message.type === "OPEN_PANEL") {
+        panel.open();
+      }
+      if (message.type === "CLIP_SAVED") {
+        panel.refresh();
+      }
     });
-  });
+  } catch {
+    // Extension context invalidated during setup
+  }
+
+  // Detect extension context invalidation via port disconnect
+  try {
+    chrome.runtime.onConnect.addListener((port) => {
+      port.onDisconnect.addListener(() => {
+        cleanup();
+      });
+    });
+  } catch {
+    // Extension context invalidated during setup
+  }
 
   function cleanup() {
     htmlObserver.disconnect();
     if (bodyObserver) {
       bodyObserver.disconnect();
+      bodyObserver = null;
     }
     selection.destroy();
     fab.destroy();
@@ -120,4 +188,3 @@ if (document.readyState === "loading") {
 } else {
   main();
 }
-

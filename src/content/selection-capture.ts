@@ -45,7 +45,6 @@ export function initSelectionCapture(): SelectionCaptureHandle {
   root.appendChild(saveBtn);
   shadow.appendChild(styleEl);
   shadow.appendChild(root);
-  document.body.appendChild(host);
 
   let hideTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -83,7 +82,7 @@ export function initSelectionCapture(): SelectionCaptureHandle {
       const rect = range.getBoundingClientRect();
       showButton(
         rect.left + rect.width / 2 - saveBtn.offsetWidth / 2,
-        rect.top + window.scrollY
+        rect.top
       );
     } else {
       hideButton();

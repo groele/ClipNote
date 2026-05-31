@@ -5,6 +5,44 @@ import { getSettings, saveSettings } from "../storage/sync-settings";
 
 const CONTEXT_MENU_ID = "clipnote-save-selection";
 
+/**
+ * Dynamically inject content scripts into all already-open HTTP/HTTPS tabs.
+ * Called on both onInstalled (extension install/update/reload) and
+ * onStartup (browser launch) to ensure maximum coverage.
+ */
+async function injectContentScriptsIntoAllTabs() {
+  try {
+    const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+    for (const tab of tabs) {
+      if (!tab.id || !tab.url) continue;
+      // Skip browser internal pages
+      if (
+        tab.url.startsWith("chrome://") ||
+        tab.url.startsWith("chrome-extension://") ||
+        tab.url.startsWith("edge://") ||
+        tab.url.startsWith("about:")
+      ) {
+        continue;
+      }
+
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ["content.js"],
+        });
+        await chrome.scripting.insertCSS({
+          target: { tabId: tab.id },
+          files: ["content.css"],
+        });
+      } catch (err) {
+        // Tab may be protected (e.g. chrome web store) — silently skip
+      }
+    }
+  } catch (e) {
+    console.error("ClipNote: Failed to inject into open tabs:", e);
+  }
+}
+
 chrome.runtime.onInstalled.addListener(async () => {
   const settings = await getSettings();
   await saveSettings(settings);
@@ -15,39 +53,14 @@ chrome.runtime.onInstalled.addListener(async () => {
     contexts: ["selection"],
   });
 
-  // Dynamically inject content scripts into already opened HTTP/HTTPS tabs
-  try {
-    const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
-    for (const tab of tabs) {
-      if (tab.id && tab.url) {
-        // Skip browser internal pages
-        if (
-          tab.url.startsWith("chrome://") ||
-          tab.url.startsWith("chrome-extension://") ||
-          tab.url.startsWith("edge://") ||
-          tab.url.startsWith("about:")
-        ) {
-          continue;
-        }
-
-        try {
-          await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            files: ["content.js"],
-          });
-          await chrome.scripting.insertCSS({
-            target: { tabId: tab.id },
-            files: ["content.css"],
-          });
-        } catch (err) {
-          console.warn(`Failed to inject content scripts into tab ${tab.id} (${tab.url}):`, err);
-        }
-      }
-    }
-  } catch (e) {
-    console.error("Failed to query tabs for automatic injection:", e);
-  }
+  await injectContentScriptsIntoAllTabs();
 });
+
+// Also inject on browser startup (restores tabs from previous session)
+chrome.runtime.onStartup.addListener(async () => {
+  await injectContentScriptsIntoAllTabs();
+});
+
 
 async function saveClipAndNote(payload: { text: string; url?: string; title?: string; timestamp: number }) {
   const clipId = crypto.randomUUID();

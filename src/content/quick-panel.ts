@@ -203,7 +203,6 @@ export function initQuickPanel(): QuickPanelHandle {
   root.appendChild(panel);
   shadow.appendChild(styleEl);
   shadow.appendChild(root);
-  document.body.appendChild(host);
 
   // Dragging support for ClipNote Quick Notes panel (using header)
   let isPanelDragging = false;
@@ -267,9 +266,13 @@ export function initQuickPanel(): QuickPanelHandle {
 
     // Save panel position
     const rect = panel.getBoundingClientRect();
-    await chrome.storage.local.set({
-      panelPosition: { left: rect.left, top: rect.top }
-    });
+    try {
+      await chrome.storage.local.set({
+        panelPosition: { left: rect.left, top: rect.top }
+      });
+    } catch {
+      // Extension context invalidated
+    }
   });
 
   async function handleSave() {
@@ -281,9 +284,13 @@ export function initQuickPanel(): QuickPanelHandle {
   }
 
   async function loadClips(forceFetchFromStorage = false): Promise<void> {
-    if (forceFetchFromStorage || allClips.length === 0) {
-      const result = await chrome.storage.local.get("clips");
-      allClips = result.clips ?? [];
+    try {
+      if (forceFetchFromStorage || allClips.length === 0) {
+        const result = await chrome.storage.local.get("clips");
+        allClips = result.clips ?? [];
+      }
+    } catch {
+      // Extension context invalidated — use cached clips
     }
     let clips = allClips;
     if (currentSearchQuery.trim() !== "") {
@@ -308,12 +315,18 @@ export function initQuickPanel(): QuickPanelHandle {
   }
 
   async function deleteClip(id: string): Promise<void> {
-    const result = await chrome.storage.local.get("clips");
-    const clips: Clip[] = result.clips ?? [];
-    const filtered = clips.filter((c) => c.id !== id);
-    await chrome.storage.local.set({ clips: filtered });
-    allClips = filtered;
-    loadClips(false);
+    try {
+      const result = await chrome.storage.local.get("clips");
+      const clips: Clip[] = result.clips ?? [];
+      const filtered = clips.filter((c) => c.id !== id);
+      await chrome.storage.local.set({ clips: filtered });
+      allClips = filtered;
+      loadClips(false);
+    } catch {
+      // Extension context invalidated — remove from local cache only
+      allClips = allClips.filter((c) => c.id !== id);
+      renderClips(allClips);
+    }
   }
 
   function showToast(message: string, container: HTMLElement) {
@@ -482,20 +495,32 @@ export function initQuickPanel(): QuickPanelHandle {
 
     panel.classList.add("clipnote-panel--open");
     
-    const data = await chrome.storage.local.get("panelPosition");
-    if (data.panelPosition) {
-      const { left, top } = data.panelPosition;
-      panel.style.bottom = "auto";
-      panel.style.right = "auto";
-      panel.style.left = `${left}px`;
-      panel.style.top = `${top}px`;
-    } else if (fabRect) {
-      positionPanel(fabRect);
-    } else {
-      panel.style.left = "auto";
-      panel.style.top = "auto";
-      panel.style.right = "20px";
-      panel.style.bottom = "80px";
+    try {
+      const data = await chrome.storage.local.get("panelPosition");
+      if (data.panelPosition) {
+        const { left, top } = data.panelPosition;
+        panel.style.bottom = "auto";
+        panel.style.right = "auto";
+        panel.style.left = `${left}px`;
+        panel.style.top = `${top}px`;
+      } else if (fabRect) {
+        positionPanel(fabRect);
+      } else {
+        panel.style.left = "auto";
+        panel.style.top = "auto";
+        panel.style.right = "20px";
+        panel.style.bottom = "80px";
+      }
+    } catch {
+      // Extension context invalidated — use default position
+      if (fabRect) {
+        positionPanel(fabRect);
+      } else {
+        panel.style.left = "auto";
+        panel.style.top = "auto";
+        panel.style.right = "20px";
+        panel.style.bottom = "80px";
+      }
     }
     loadClips(true);
   }
