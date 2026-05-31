@@ -17,6 +17,11 @@ export function MarkdownEditor({ note, notebooks, onChange }: MarkdownEditorProp
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const saveTimerRef = useRef<number>();
 
+  const noteRef = useRef(note);
+  useEffect(() => {
+    noteRef.current = note;
+  }, [note]);
+
   const updateNote = useCallback(
     (updates: Partial<Note>) => {
       const updated = { ...note, ...updates, updatedAt: Date.now() };
@@ -42,7 +47,22 @@ export function MarkdownEditor({ note, notebooks, onChange }: MarkdownEditorProp
 
   useEffect(() => {
     return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        // Force flush pending auto-save immediately to prevent data loss!
+        const pendingNote = noteRef.current;
+        chrome.storage.local.get("notes").then((data) => {
+          const notes: Note[] = data.notes || [];
+          const idx = notes.findIndex((n) => n.id === pendingNote.id);
+          if (idx >= 0) {
+            notes[idx] = pendingNote;
+            chrome.storage.local.set({ notes });
+          }
+        });
+        db.updateNote(pendingNote).catch((err) =>
+          console.error("Failed to flush pending note to IndexedDB on unmount:", err)
+        );
+      }
     };
   }, []);
 

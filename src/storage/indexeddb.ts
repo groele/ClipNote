@@ -43,27 +43,6 @@ function txRequest<T>(storeName: string, mode: IDBTransactionMode, fn: (store: I
   });
 }
 
-function txRequestAll<T>(storeName: string, fn: (store: IDBObjectStore) => IDBRequest<IDBCursorWithValue | null>): Promise<T[]> {
-  return getDB().then(db => {
-    return new Promise<T[]>((resolve, reject) => {
-      const tx = db.transaction(storeName, "readonly");
-      const store = tx.objectStore(storeName);
-      const request = fn(store);
-      const results: T[] = [];
-      request.onsuccess = () => {
-        const cursor = request.result;
-        if (cursor) {
-          results.push(cursor.value);
-          cursor.continue();
-        } else {
-          resolve(results);
-        }
-      };
-      request.onerror = () => reject(request.error);
-    });
-  });
-}
-
 export const db = {
   addNote(note: Note): Promise<void> {
     return txRequest("notes", "readwrite", store => store.put(note)).then(() => {});
@@ -74,7 +53,7 @@ export const db = {
   },
 
   getAllNotes(): Promise<Note[]> {
-    return txRequestAll<Note>("notes", store => store.openCursor());
+    return txRequest<Note[]>("notes", "readonly", store => store.getAll());
   },
 
   updateNote(note: Note): Promise<void> {
@@ -90,7 +69,7 @@ export const db = {
   },
 
   getAllClips(): Promise<Clip[]> {
-    return txRequestAll<Clip>("clips", store => store.openCursor());
+    return txRequest<Clip[]>("clips", "readonly", store => store.getAll());
   },
 
   deleteClip(id: string): Promise<void> {
